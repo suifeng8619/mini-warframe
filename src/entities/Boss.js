@@ -830,6 +830,14 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   }
 
   die() {
+    // 通知场景Boss被击杀（用于任务奖励和材料掉落）
+    if (this.scene.onEnemyKilled) {
+      // Boss掉落更多奖励，设置一个标记
+      this.isBoss = true
+      this.stats.level = this.scene.waveNumber || 10
+      this.scene.onEnemyKilled(this)
+    }
+
     // Boss击杀特效
     for (let i = 0; i < 5; i++) {
       this.scene.time.delayedCall(i * 100, () => {

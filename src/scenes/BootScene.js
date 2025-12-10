@@ -74,9 +74,35 @@ export class BootScene extends Phaser.Scene {
           { id: 'redirection', rank: 2 },
           { id: 'serration', rank: 5 },
           { id: 'point_strike', rank: 2 }
+        ],
+        // 新手初始材料，让玩家能体验铸造功能
+        materials: {
+          ferrite: 500,
+          nano_spores: 300,
+          alloy_plate: 200,
+          polymer_bundle: 150,
+          rubedo: 100,
+          salvage: 200,
+          plastids: 50,
+          circuits: 30,
+          morphics: 5,
+          neurodes: 2,
+          control_module: 1,
+          orokin_cell: 1
+        },
+        // 初始蓝图
+        blueprints: [
+          { id: 'braton_vandal', type: 'weapon' },
+          { id: 'health_restore', type: 'consumable' }
         ]
       },
-      credits: 10000,
+      // 已完成的星图节点
+      completedNodes: [],
+      // 当前任务信息（从星图选择后设置）
+      currentMission: null,
+      // 铸造队列
+      foundryQueue: [],
+      credits: 15000,
       mastery: 1,
       highScore: 0,
       totalKills: 0,

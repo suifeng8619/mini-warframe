@@ -2,7 +2,8 @@ import Phaser from 'phaser'
 import { Warframe } from '../entities/Warframe.js'
 import { Enemy } from '../entities/Enemy.js'
 import { Boss } from '../entities/Boss.js'
-import { WAVE_CONFIG, getRandomEnemyType } from '../data/enemies.js'
+import { WAVE_CONFIG, getRandomEnemyType, ENEMIES } from '../data/enemies.js'
+import { MATERIALS } from '../data/materials.js'
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -10,6 +11,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // 获取任务信息
+    this.missionData = window.GAME_STATE.currentMission || null
+
     // 游戏状态
     this.waveNumber = 1
     this.killCount = 0
@@ -18,6 +22,20 @@ export class GameScene extends Phaser.Scene {
     this.waveComplete = false
     this.isGameOver = false
     this.isPaused = false
+    this.missionComplete = false
+
+    // 任务奖励累计
+    this.earnedCredits = 0
+    this.earnedMaterials = {}
+
+    // 根据任务设置敌人等级范围
+    if (this.missionData) {
+      this.minEnemyLevel = this.missionData.enemyLevel[0]
+      this.maxEnemyLevel = this.missionData.enemyLevel[1]
+    } else {
+      this.minEnemyLevel = 1
+      this.maxEnemyLevel = 100
+    }
 
     // 背景
     this.add.image(640, 360, 'background').setScrollFactor(0)
@@ -431,7 +449,19 @@ export class GameScene extends Phaser.Scene {
     this.bossDefeated = false
     this.currentBoss = null
 
-    // 检查是否是Boss波次
+    // 如果是Boss任务类型，第一波就是Boss
+    if (this.missionData && this.missionData.type === 'boss' && this.waveNumber === 1) {
+      const bossType = this.missionData.bossType || 'captain_vor'
+      this.enemiesThisWave = 0
+      this.showWaveAnnouncement(true, bossType)
+
+      this.time.delayedCall(2000, () => {
+        this.spawnBoss(bossType)
+      })
+      return
+    }
+
+    // 检查是否是Boss波次 (普通模式每5波一个Boss)
     const bossType = WAVE_CONFIG.getBossWave(this.waveNumber)
 
     if (bossType) {
@@ -598,10 +628,17 @@ export class GameScene extends Phaser.Scene {
     // 确保Y坐标在有效范围内
     spawnY = Math.max(100, Math.min(this.levelHeight - 150 - Math.random() * 200, this.levelHeight - 100))
 
-    // 选择敌人类型
-    const enemyType = getRandomEnemyType(this.waveNumber)
-    // 等级 = 波次数，乘数在Enemy构造函数中应用
-    const enemyLevel = this.waveNumber
+    // 根据任务阵营选择敌人类型
+    let enemyType
+    if (this.missionData && this.missionData.faction) {
+      enemyType = this.getEnemyTypeByFaction(this.missionData.faction, this.waveNumber)
+    } else {
+      enemyType = getRandomEnemyType(this.waveNumber)
+    }
+
+    // 等级根据任务范围和波次计算
+    const baseLevel = this.minEnemyLevel + Math.floor((this.maxEnemyLevel - this.minEnemyLevel) * (this.waveNumber - 1) / 10)
+    const enemyLevel = Math.min(baseLevel + Math.floor(Math.random() * 3), this.maxEnemyLevel)
 
     // 创建敌人
     const enemy = new Enemy(this, spawnX, spawnY, enemyType, enemyLevel)
@@ -610,13 +647,43 @@ export class GameScene extends Phaser.Scene {
     this.enemiesSpawned++
   }
 
+  // 根据阵营获取敌人类型
+  getEnemyTypeByFaction(faction, wave) {
+    const factionEnemies = {
+      grineer: ['grineer_lancer', 'grineer_trooper', 'grineer_heavy', 'grineer_bombard', 'grineer_napalm'],
+      corpus: ['corpus_crewman', 'corpus_tech', 'corpus_moa', 'corpus_nullifier', 'corpus_sniper'],
+      infested: ['infested_charger', 'infested_runner', 'infested_leaper', 'infested_ancient', 'infested_boiler'],
+      corrupted: ['corrupted_lancer', 'corrupted_crewman', 'corrupted_moa', 'corrupted_heavy', 'corrupted_ancient']
+    }
+
+    const enemies = factionEnemies[faction] || factionEnemies.grineer
+
+    // 根据波次解锁更强的敌人
+    let maxIndex = Math.min(Math.floor(wave / 2), enemies.length - 1)
+    const index = Math.floor(Math.random() * (maxIndex + 1))
+
+    // 检查敌人类型是否在ENEMIES中存在，否则回退
+    const selectedType = enemies[index]
+    if (ENEMIES[selectedType]) {
+      return selectedType
+    }
+    return getRandomEnemyType(wave)
+  }
+
   checkWaveComplete() {
     // Boss波次检查
     if (this.currentBoss) {
       if (this.bossDefeated || !this.currentBoss.active) {
         this.waveComplete = true
-        this.waveNumber++
         this.currentBoss = null
+
+        // Boss任务类型 - 击败Boss即完成任务
+        if (this.missionData && this.missionData.type === 'boss') {
+          this.completeMission()
+          return
+        }
+
+        this.waveNumber++
 
         // 更新最高波次记录
         if (this.waveNumber > window.GAME_STATE.highScore) {
@@ -629,7 +696,7 @@ export class GameScene extends Phaser.Scene {
 
         // 延迟后开始下一波
         this.time.delayedCall(WAVE_CONFIG.waveBreakTime + 2000, () => {
-          if (!this.isGameOver) {
+          if (!this.isGameOver && !this.missionComplete) {
             this.startWave()
           }
         })
@@ -642,6 +709,12 @@ export class GameScene extends Phaser.Scene {
       this.waveComplete = true
       this.waveNumber++
 
+      // 检查任务完成条件
+      if (this.checkMissionComplete()) {
+        this.completeMission()
+        return
+      }
+
       // 更新最高波次记录
       if (this.waveNumber > window.GAME_STATE.highScore) {
         window.GAME_STATE.highScore = this.waveNumber
@@ -653,11 +726,85 @@ export class GameScene extends Phaser.Scene {
 
       // 延迟后开始下一波
       this.time.delayedCall(WAVE_CONFIG.waveBreakTime, () => {
-        if (!this.isGameOver) {
+        if (!this.isGameOver && !this.missionComplete) {
           this.startWave()
         }
       })
     }
+  }
+
+  // 检查任务是否完成
+  checkMissionComplete() {
+    if (!this.missionData) return false
+
+    switch (this.missionData.type) {
+      case 'defense':
+        // 防御任务：完成5波
+        return this.waveNumber > 5
+      case 'exterminate':
+        // 歼灭任务：击杀一定数量
+        const targetKills = 20 + (this.missionData.enemyLevel[0] || 1) * 2
+        return this.killCount >= targetKills
+      case 'survival':
+        // 生存任务：坚持5波
+        return this.waveNumber > 5
+      case 'capture':
+      case 'spy':
+      case 'sabotage':
+        // 简化处理：完成3波
+        return this.waveNumber > 3
+      default:
+        return this.waveNumber > 5
+    }
+  }
+
+  // 完成任务
+  completeMission() {
+    if (this.missionComplete) return
+    this.missionComplete = true
+
+    // 停止生成
+    if (this.spawnTimer) {
+      this.spawnTimer.destroy()
+      this.spawnTimer = null
+    }
+
+    // 计算任务奖励
+    const baseCredits = 1000 + (this.missionData?.enemyLevel[0] || 1) * 200
+    this.earnedCredits += baseCredits + this.killCount * 50
+
+    // 标记节点完成
+    if (this.missionData && this.missionData.nodeId) {
+      if (!window.GAME_STATE.completedNodes) {
+        window.GAME_STATE.completedNodes = []
+      }
+      if (!window.GAME_STATE.completedNodes.includes(this.missionData.nodeId)) {
+        window.GAME_STATE.completedNodes.push(this.missionData.nodeId)
+      }
+    }
+
+    // 发放奖励
+    window.GAME_STATE.credits = (window.GAME_STATE.credits || 0) + this.earnedCredits
+
+    // 发放材料
+    for (const [matId, amount] of Object.entries(this.earnedMaterials)) {
+      if (!window.GAME_STATE.inventory) {
+        window.GAME_STATE.inventory = {}
+      }
+      window.GAME_STATE.inventory[matId] = (window.GAME_STATE.inventory[matId] || 0) + amount
+    }
+
+    // 更新统计
+    window.GAME_STATE.totalKills = (window.GAME_STATE.totalKills || 0) + this.killCount
+    window.GAME_STATE.totalMissions = (window.GAME_STATE.totalMissions || 0) + 1
+
+    // 保存
+    this.saveGame()
+
+    // 显示任务完成界面
+    this.time.delayedCall(500, () => {
+      this.showMissionComplete()
+    })
   }
 
   showWaveComplete() {
@@ -880,5 +1027,212 @@ export class GameScene extends Phaser.Scene {
 
   saveGame() {
     localStorage.setItem('miniWarframeSave', JSON.stringify(window.GAME_STATE))
+  }
+
+  // 任务完成界面
+  showMissionComplete() {
+    // 暗化背景
+    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.8)
+    overlay.setScrollFactor(0)
+    overlay.setDepth(400)
+
+    // 任务完成文字
+    const completeText = this.add.text(640, 150, 'MISSION COMPLETE', {
+      fontFamily: 'Arial Black',
+      fontSize: '56px',
+      color: '#00ff88',
+      stroke: '#003322',
+      strokeThickness: 4
+    })
+    completeText.setOrigin(0.5)
+    completeText.setScrollFactor(0)
+    completeText.setDepth(450)
+
+    // 奖励标题
+    this.add.text(640, 230, '任务奖励', {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#ffaa00'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(450)
+
+    // 星币奖励
+    this.add.text(640, 280, `星币: +${this.earnedCredits.toLocaleString()}`, {
+      fontFamily: 'Arial',
+      fontSize: '28px',
+      color: '#ffcc00'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(450)
+
+    // 材料奖励
+    let yOffset = 320
+    const materialEntries = Object.entries(this.earnedMaterials)
+    if (materialEntries.length > 0) {
+      this.add.text(640, yOffset, '获得材料:', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#88aacc'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(450)
+      yOffset += 30
+
+      materialEntries.slice(0, 6).forEach(([matId, amount]) => {
+        const matData = MATERIALS[matId]
+        const matName = matData?.displayName || matId
+        this.add.text(640, yOffset, `${matName}: +${amount}`, {
+          fontFamily: 'Arial',
+          fontSize: '16px',
+          color: '#aaaaaa'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(450)
+        yOffset += 25
+      })
+    }
+
+    // 统计信息
+    yOffset = Math.max(yOffset + 20, 450)
+    this.add.text(640, yOffset, [
+      `击杀数: ${this.killCount}`,
+      `波次: ${this.waveNumber}`
+    ].join('    '), {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#888888'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(450)
+
+    // 继续按钮
+    const continueBtn = this.createButton(640, 550, '继续', () => {
+      this.scene.stop('UIScene')
+      this.scene.start('NavigationScene')
+    })
+    continueBtn.setDepth(460)
+
+    // 返回菜单按钮
+    const menuBtn = this.createButton(640, 620, '返回菜单', () => {
+      this.scene.stop('UIScene')
+      this.scene.start('MenuScene')
+    })
+    menuBtn.setDepth(460)
+  }
+
+  // 敌人死亡时调用的掉落方法
+  onEnemyKilled(enemy) {
+    this.killCount++
+
+    // 基础星币奖励
+    const creditDrop = 10 + enemy.stats.level * 5
+    this.earnedCredits += creditDrop
+
+    // 材料掉落
+    this.rollMaterialDrop(enemy)
+
+    // 生成拾取物
+    this.spawnPickupFromEnemy(enemy)
+  }
+
+  // 材料掉落判定
+  rollMaterialDrop(enemy) {
+    // 根据阵营决定可能掉落的材料
+    const factionDrops = {
+      grineer: ['ferrite', 'rubedo', 'alloy_plate', 'morphics', 'neurodes'],
+      corpus: ['alloy_plate', 'polymer_bundle', 'circuits', 'control_module', 'neural_sensors'],
+      infested: ['nano_spores', 'plastids', 'mutagen_sample', 'neurodes'],
+      corrupted: ['ferrite', 'rubedo', 'orokin_cell', 'argon_crystal']
+    }
+
+    const faction = this.missionData?.faction || 'grineer'
+    const possibleDrops = factionDrops[faction] || factionDrops.grineer
+
+    // 掉落概率
+    const dropChance = 0.15 + (enemy.stats.level || 1) * 0.005
+
+    if (Math.random() < dropChance) {
+      // 随机选择一种材料
+      const materialId = possibleDrops[Math.floor(Math.random() * possibleDrops.length)]
+      const amount = Math.ceil(Math.random() * 3)
+
+      if (!this.earnedMaterials[materialId]) {
+        this.earnedMaterials[materialId] = 0
+      }
+      this.earnedMaterials[materialId] += amount
+
+      // 显示掉落提示
+      this.showDropText(enemy.x, enemy.y, materialId, amount)
+    }
+
+    // 稀有材料掉落 (低概率)
+    const rareMaterials = ['orokin_cell', 'neural_sensors', 'neurodes', 'argon_crystal']
+    if (Math.random() < 0.02) {
+      const rareMat = rareMaterials[Math.floor(Math.random() * rareMaterials.length)]
+      if (!this.earnedMaterials[rareMat]) {
+        this.earnedMaterials[rareMat] = 0
+      }
+      this.earnedMaterials[rareMat] += 1
+      this.showDropText(enemy.x, enemy.y - 20, rareMat, 1, true)
+    }
+  }
+
+  // 显示掉落文字
+  showDropText(x, y, materialId, amount, isRare = false) {
+    const matData = MATERIALS[materialId]
+    const matName = matData?.displayName || materialId
+
+    const dropText = this.add.text(x, y, `+${amount} ${matName}`, {
+      fontFamily: 'Arial',
+      fontSize: isRare ? '16px' : '12px',
+      color: isRare ? '#ffaa00' : '#88ff88',
+      stroke: '#000000',
+      strokeThickness: 2
+    })
+    dropText.setOrigin(0.5)
+    dropText.setDepth(300)
+
+    this.tweens.add({
+      targets: dropText,
+      y: y - 40,
+      alpha: 0,
+      duration: 1500,
+      onComplete: () => {
+        if (dropText && dropText.active) dropText.destroy()
+      }
+    })
+  }
+
+  // 从敌人位置生成拾取物
+  spawnPickupFromEnemy(enemy) {
+    // 能量球掉落
+    if (Math.random() < 0.2) {
+      this.spawnPickup(enemy.x, enemy.y, 'energy', 25)
+    }
+    // 生命球掉落
+    if (Math.random() < 0.15) {
+      this.spawnPickup(enemy.x + 20, enemy.y, 'health', 30)
+    }
+    // 弹药掉落
+    if (Math.random() < 0.25) {
+      this.spawnPickup(enemy.x - 20, enemy.y, 'ammo', 20)
+    }
+  }
+
+  // 生成拾取物
+  spawnPickup(x, y, type, value) {
+    const pickup = this.pickups.get(x, y, `pickup_${type}`)
+    if (pickup) {
+      pickup.setActive(true)
+      pickup.setVisible(true)
+      pickup.pickupType = type
+      pickup.value = value
+
+      // 让拾取物有一点弹跳
+      if (pickup.body) {
+        pickup.body.setVelocity((Math.random() - 0.5) * 100, -150)
+        pickup.body.setGravityY(300)
+        pickup.body.setBounce(0.3)
+      }
+
+      // 10秒后消失
+      this.time.delayedCall(10000, () => {
+        if (pickup.active) {
+          pickup.setActive(false)
+          pickup.setVisible(false)
+        }
+      })
+    }
   }
 }

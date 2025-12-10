@@ -687,6 +687,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.summoner.summonCount = Math.max(0, (this.summoner.summonCount || 1) - 1)
     }
 
+    // 通知场景敌人被击杀（用于任务奖励和材料掉落）
+    if (this.scene.onEnemyKilled) {
+      this.scene.onEnemyKilled(this)
+    }
+
     // 掉落
     this.dropLoot()
 
