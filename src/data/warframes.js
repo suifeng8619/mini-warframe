@@ -149,6 +149,260 @@ export const WARFRAMES = {
       }
     ],
     color: 0xff44ff
+  },
+
+  rhino: {
+    id: 'rhino',
+    name: 'Rhino',
+    displayName: '犀牛',
+    description: '重装坦克，高护甲高生存',
+    baseStats: {
+      health: 400,
+      maxHealth: 400,
+      shield: 150,
+      maxShield: 150,
+      energy: 100,
+      maxEnergy: 100,
+      armor: 450,
+      speed: 0.85,
+      jumpForce: 420
+    },
+    abilities: [
+      {
+        id: 'rhino_charge',
+        name: '犀牛冲锋',
+        description: '向前冲锋撞飞敌人',
+        energyCost: 25,
+        cooldown: 3000,
+        damage: 200,
+        range: 400,
+        knockback: 500
+      },
+      {
+        id: 'iron_skin',
+        name: '钢铁皮肤',
+        description: '获得大量护甲吸收伤害',
+        energyCost: 50,
+        cooldown: 0,
+        duration: 0, // 持续到被打破
+        absorb: 1200,
+        isToggle: false
+      },
+      {
+        id: 'roar',
+        name: '战吼',
+        description: '提升自身和附近友方伤害',
+        energyCost: 75,
+        cooldown: 15000,
+        duration: 10000,
+        damageBoost: 0.5,
+        range: 300
+      }
+    ],
+    color: 0x888888
+  },
+
+  loki: {
+    id: 'loki',
+    name: 'Loki',
+    displayName: '洛基',
+    description: '潜行刺客，擅长欺骗和控制',
+    baseStats: {
+      health: 150,
+      maxHealth: 150,
+      shield: 150,
+      maxShield: 150,
+      energy: 175,
+      maxEnergy: 175,
+      armor: 65,
+      speed: 1.25,
+      jumpForce: 480
+    },
+    abilities: [
+      {
+        id: 'decoy',
+        name: '诱饵',
+        description: '创造分身吸引敌人火力',
+        energyCost: 25,
+        cooldown: 5000,
+        duration: 8000,
+        health: 200
+      },
+      {
+        id: 'invisibility',
+        name: '隐身',
+        description: '变为隐形，敌人无法发现',
+        energyCost: 50,
+        cooldown: 0,
+        duration: 12000,
+        backstabMultiplier: 4.0
+      },
+      {
+        id: 'radial_disarm',
+        name: '缴械',
+        description: '解除范围内敌人武器，迫使近战',
+        energyCost: 75,
+        cooldown: 20000,
+        range: 300,
+        duration: 15000
+      }
+    ],
+    color: 0x44aaff
+  },
+
+  nova: {
+    id: 'nova',
+    name: 'Nova',
+    displayName: '诺瓦',
+    description: '反物质专家，高爆发AOE',
+    baseStats: {
+      health: 200,
+      maxHealth: 200,
+      shield: 225,
+      maxShield: 225,
+      energy: 175,
+      maxEnergy: 175,
+      armor: 65,
+      speed: 1.1,
+      jumpForce: 450
+    },
+    abilities: [
+      {
+        id: 'null_star',
+        name: '虚空星辰',
+        description: '召唤环绕的粒子自动攻击敌人',
+        energyCost: 25,
+        cooldown: 8000,
+        damage: 100,
+        particleCount: 6,
+        duration: 20000
+      },
+      {
+        id: 'antimatter_drop',
+        name: '反物质投射',
+        description: '发射可吸收伤害的反物质球',
+        energyCost: 50,
+        cooldown: 4000,
+        baseDamage: 100,
+        absorbMultiplier: 4.0,
+        range: 500
+      },
+      {
+        id: 'molecular_prime',
+        name: '分子填充',
+        description: '减速敌人并使其受到额外伤害',
+        energyCost: 100,
+        cooldown: 25000,
+        duration: 15000,
+        range: 400,
+        slowPercent: 0.5,
+        damageMultiplier: 2.0,
+        explosionDamage: 200
+      }
+    ],
+    color: 0xffaa00
+  },
+
+  trinity: {
+    id: 'trinity',
+    name: 'Trinity',
+    displayName: '圣女',
+    description: '治疗辅助，能量和生命恢复',
+    baseStats: {
+      health: 200,
+      maxHealth: 200,
+      shield: 200,
+      maxShield: 200,
+      energy: 200,
+      maxEnergy: 200,
+      armor: 100,
+      speed: 1.0,
+      jumpForce: 450
+    },
+    abilities: [
+      {
+        id: 'well_of_life',
+        name: '生命之井',
+        description: '标记敌人为生命源，攻击它恢复生命',
+        energyCost: 25,
+        cooldown: 3000,
+        duration: 10000,
+        healPercent: 0.5
+      },
+      {
+        id: 'energy_vampire',
+        name: '能量吸取',
+        description: '从敌人身上吸取能量',
+        energyCost: 50,
+        cooldown: 5000,
+        duration: 5000,
+        energyPerPulse: 25,
+        pulseCount: 4
+      },
+      {
+        id: 'blessing',
+        name: '祝福',
+        description: '恢复生命并提供短暂伤害减免',
+        energyCost: 100,
+        cooldown: 20000,
+        healPercent: 1.0,
+        damageReduction: 0.5,
+        duration: 8000
+      }
+    ],
+    color: 0x88ffaa
+  },
+
+  ash: {
+    id: 'ash',
+    name: 'Ash',
+    displayName: '灰烬',
+    description: '忍者刺客，高单体爆发',
+    baseStats: {
+      health: 225,
+      maxHealth: 225,
+      shield: 150,
+      maxShield: 150,
+      energy: 125,
+      maxEnergy: 125,
+      armor: 150,
+      speed: 1.15,
+      jumpForce: 470
+    },
+    abilities: [
+      {
+        id: 'shuriken',
+        name: '手里剑',
+        description: '投掷手里剑造成切割伤害',
+        energyCost: 25,
+        cooldown: 2000,
+        damage: 200,
+        projectileCount: 2,
+        bleedDuration: 5000,
+        bleedDamage: 50
+      },
+      {
+        id: 'smoke_screen',
+        name: '烟雾弹',
+        description: '释放烟雾隐身并眩晕敌人',
+        energyCost: 35,
+        cooldown: 8000,
+        duration: 8000,
+        stunDuration: 2000,
+        range: 150
+      },
+      {
+        id: 'blade_storm',
+        name: '刀刃风暴',
+        description: '标记敌人后瞬移斩杀',
+        energyCost: 75,
+        cooldown: 15000,
+        damagePerHit: 300,
+        maxTargets: 5,
+        hitsPerTarget: 3
+      }
+    ],
+    color: 0x444444
   }
 }
 

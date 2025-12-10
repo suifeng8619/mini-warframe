@@ -438,6 +438,56 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
       case 'crush':
         this.abilityCrush(ability)
         break
+      // Rhino技能
+      case 'rhino_charge':
+        this.abilityRhinoCharge(ability)
+        break
+      case 'iron_skin':
+        this.abilityIronSkin(ability)
+        break
+      case 'roar':
+        this.abilityRoar(ability)
+        break
+      // Loki技能
+      case 'decoy':
+        this.abilityDecoy(ability)
+        break
+      case 'invisibility':
+        this.abilityInvisibility(ability)
+        break
+      case 'radial_disarm':
+        this.abilityRadialDisarm(ability)
+        break
+      // Nova技能
+      case 'null_star':
+        this.abilityNullStar(ability)
+        break
+      case 'antimatter_drop':
+        this.abilityAntimatterDrop(ability)
+        break
+      case 'molecular_prime':
+        this.abilityMolecularPrime(ability)
+        break
+      // Trinity技能
+      case 'well_of_life':
+        this.abilityWellOfLife(ability)
+        break
+      case 'energy_vampire':
+        this.abilityEnergyVampire(ability)
+        break
+      case 'blessing':
+        this.abilityBlessing(ability)
+        break
+      // Ash技能
+      case 'shuriken':
+        this.abilityShuriken(ability)
+        break
+      case 'smoke_screen':
+        this.abilitySmokeScreen(ability)
+        break
+      case 'blade_storm':
+        this.abilityBladeStorm(ability)
+        break
     }
   }
 
@@ -988,6 +1038,32 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
   takeDamage(amount) {
     if (this.invincibleTime > 0) return
 
+    // Rhino钢铁皮肤优先吸收伤害
+    if (this.ironSkinActive && this.ironSkinHealth > 0) {
+      const absorbed = Math.min(this.ironSkinHealth, amount)
+      this.ironSkinHealth -= absorbed
+      amount -= absorbed
+
+      if (this.ironSkinHealth <= 0) {
+        this.ironSkinActive = false
+        if (this.ironSkinGraphics) {
+          this.ironSkinGraphics.destroy()
+          this.ironSkinGraphics = null
+        }
+        if (this.ironSkinUpdateEvent) {
+          this.ironSkinUpdateEvent.destroy()
+          this.ironSkinUpdateEvent = null
+        }
+      }
+
+      if (amount <= 0) return
+    }
+
+    // Trinity祝福减伤
+    if (this.blessingActive && this.blessingDR > 0) {
+      amount *= (1 - this.blessingDR)
+    }
+
     // 先扣护盾
     if (this.currentShield > 0) {
       const shieldDamage = Math.min(this.currentShield, amount)
@@ -1071,5 +1147,649 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
     // 检查负数，防止误扣能量
     if (amount < 0) return
     this.currentEnergy = Math.min(this.currentEnergy + amount, this.stats.maxEnergy)
+  }
+
+  // ========== Rhino 技能 ==========
+  abilityRhinoCharge(ability) {
+    const pointer = this.scene.input.activePointer
+    const worldPoint = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const angle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y)
+
+    // 冲锋
+    this.setVelocity(Math.cos(angle) * 800, Math.sin(angle) * 400)
+    this.invincibleTime = 500
+
+    // 冲锋特效
+    const chargeEffect = this.scene.add.graphics()
+    chargeEffect.fillStyle(0x888888, 0.6)
+    chargeEffect.fillCircle(0, 0, 40)
+    chargeEffect.setPosition(this.x, this.y)
+    chargeEffect.setDepth(95)
+
+    // 跟随玩家的冲锋波
+    const chargeTimer = this.scene.time.addEvent({
+      delay: 50,
+      callback: () => {
+        if (!this.active) return
+        chargeEffect.setPosition(this.x, this.y)
+        // 撞击敌人
+        this.scene.enemies.getChildren().forEach(enemy => {
+          if (!enemy.active) return
+          const dist = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y)
+          if (dist < 60) {
+            enemy.takeDamage(ability.damage)
+            // 击退
+            if (enemy.body) {
+              const knockAngle = Phaser.Math.Angle.Between(this.x, this.y, enemy.x, enemy.y)
+              enemy.body.velocity.x = Math.cos(knockAngle) * ability.knockback
+              enemy.body.velocity.y = Math.sin(knockAngle) * ability.knockback - 200
+            }
+          }
+        })
+      },
+      repeat: 8
+    })
+
+    this.scene.time.delayedCall(500, () => {
+      chargeTimer.destroy()
+      if (chargeEffect && chargeEffect.active) {
+        chargeEffect.destroy()
+      }
+    })
+  }
+
+  abilityIronSkin(ability) {
+    // 如果已有铁甲，不能重复施放
+    if (this.ironSkinActive) return
+
+    this.ironSkinActive = true
+    this.ironSkinHealth = ability.absorb
+
+    // 铁甲视觉效果
+    this.ironSkinGraphics = this.scene.add.graphics()
+    this.ironSkinGraphics.setDepth(99)
+
+    const updateIronSkin = () => {
+      if (!this.active || !this.ironSkinActive) return
+      this.ironSkinGraphics.clear()
+      this.ironSkinGraphics.lineStyle(3, 0xaaaaaa, 0.8)
+      this.ironSkinGraphics.strokeCircle(this.x, this.y, 35)
+    }
+
+    this.ironSkinUpdateEvent = this.scene.time.addEvent({
+      delay: 16,
+      callback: updateIronSkin,
+      loop: true
+    })
+  }
+
+  abilityRoar(ability) {
+    const castX = this.x
+    const castY = this.y
+
+    // 战吼效果
+    const roarEffect = this.scene.add.circle(castX, castY, ability.range, 0xffaa00, 0.3)
+    roarEffect.setDepth(50)
+
+    this.scene.tweens.add({
+      targets: roarEffect,
+      alpha: 0,
+      scale: 1.5,
+      duration: 500,
+      onComplete: () => {
+        if (roarEffect && roarEffect.active) roarEffect.destroy()
+      }
+    })
+
+    // 提升伤害
+    this.damageBoost = ability.damageBoost
+    this.roarActive = true
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      if (this.active) {
+        this.damageBoost = 0
+        this.roarActive = false
+      }
+    })
+  }
+
+  // ========== Loki 技能 ==========
+  abilityDecoy(ability) {
+    // 创建诱饵
+    const decoy = this.scene.add.sprite(this.x, this.y, this.texture.key)
+    decoy.setTint(0x4488ff)
+    decoy.setAlpha(0.7)
+    decoy.setDepth(90)
+    decoy.health = ability.health
+
+    // 诱饵吸引敌人
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (enemy.active) {
+        enemy.decoyTarget = decoy
+      }
+    })
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      // 移除诱饵目标
+      this.scene.enemies.getChildren().forEach(enemy => {
+        if (enemy.decoyTarget === decoy) {
+          enemy.decoyTarget = null
+        }
+      })
+      if (decoy && decoy.active) {
+        decoy.destroy()
+      }
+    })
+  }
+
+  abilityInvisibility(ability) {
+    if (this.isInvisible) return
+
+    this.isInvisible = true
+    this.setAlpha(0.3)
+    this.backstabMultiplier = ability.backstabMultiplier
+
+    // 敌人无法检测
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (enemy.target === this) {
+        enemy.target = null
+      }
+    })
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      if (this.active) {
+        this.isInvisible = false
+        this.setAlpha(1)
+        this.backstabMultiplier = 1
+      }
+    })
+  }
+
+  abilityRadialDisarm(ability) {
+    const castX = this.x
+    const castY = this.y
+
+    // 缴械波
+    const disarmWave = this.scene.add.circle(castX, castY, 10, 0x44aaff, 0.5)
+    disarmWave.setDepth(200)
+
+    this.scene.tweens.add({
+      targets: disarmWave,
+      scale: ability.range / 10,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => {
+        if (disarmWave && disarmWave.active) disarmWave.destroy()
+      }
+    })
+
+    // 缴械敌人
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(castX, castY, enemy.x, enemy.y)
+      if (dist < ability.range) {
+        enemy.disarmed = true
+        enemy.originalBehavior = enemy.behavior
+        enemy.behavior = 'melee'
+
+        this.scene.time.delayedCall(ability.duration, () => {
+          if (enemy.active) {
+            enemy.disarmed = false
+            enemy.behavior = enemy.originalBehavior
+          }
+        })
+      }
+    })
+  }
+
+  // ========== Nova 技能 ==========
+  abilityNullStar(ability) {
+    // 创建环绕粒子
+    this.nullStars = []
+    for (let i = 0; i < ability.particleCount; i++) {
+      const angle = (i / ability.particleCount) * Math.PI * 2
+      const star = this.scene.add.circle(0, 0, 8, 0xffaa00, 0.8)
+      star.setDepth(99)
+      star.angle = angle
+      this.nullStars.push(star)
+    }
+
+    // 粒子环绕并自动攻击
+    const starTimer = this.scene.time.addEvent({
+      delay: 50,
+      callback: () => {
+        if (!this.active) return
+        this.nullStars.forEach((star, i) => {
+          if (!star.active) return
+          star.angle += 0.05
+          star.x = this.x + Math.cos(star.angle) * 60
+          star.y = this.y + Math.sin(star.angle) * 60
+
+          // 自动攻击最近敌人
+          this.scene.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active) return
+            const dist = Phaser.Math.Distance.Between(star.x, star.y, enemy.x, enemy.y)
+            if (dist < 100 && star.active) {
+              enemy.takeDamage(ability.damage)
+              star.destroy()
+              this.nullStars[i] = null
+            }
+          })
+        })
+        this.nullStars = this.nullStars.filter(s => s !== null)
+      },
+      loop: true
+    })
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      starTimer.destroy()
+      this.nullStars.forEach(star => {
+        if (star && star.active) star.destroy()
+      })
+      this.nullStars = []
+    })
+  }
+
+  abilityAntimatterDrop(ability) {
+    const pointer = this.scene.input.activePointer
+    const worldPoint = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const angle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y)
+
+    // 创建反物质球
+    const ball = this.scene.add.circle(this.x, this.y, 20, 0x6600ff, 0.8)
+    ball.setDepth(200)
+    ball.damage = ability.baseDamage
+
+    const speed = 200
+    const vx = Math.cos(angle) * speed
+    const vy = Math.sin(angle) * speed
+
+    const moveTimer = this.scene.time.addEvent({
+      delay: 16,
+      callback: () => {
+        if (!ball.active) return
+        ball.x += vx * 0.016
+        ball.y += vy * 0.016
+
+        // 吸收玩家子弹伤害
+        this.scene.playerBullets.getChildren().forEach(bullet => {
+          if (!bullet.active) return
+          const dist = Phaser.Math.Distance.Between(ball.x, ball.y, bullet.x, bullet.y)
+          if (dist < 30) {
+            ball.damage += bullet.damage * ability.absorbMultiplier
+            bullet.setActive(false)
+            bullet.setVisible(false)
+          }
+        })
+      },
+      loop: true
+    })
+
+    // 到达目标或超时后爆炸
+    this.scene.time.delayedCall(2000, () => {
+      moveTimer.destroy()
+      if (!ball.active) return
+
+      // 爆炸
+      const explosion = this.scene.add.circle(ball.x, ball.y, 10, 0xff00ff, 0.8)
+      explosion.setDepth(200)
+
+      this.scene.tweens.add({
+        targets: explosion,
+        scale: 8,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => {
+          if (explosion && explosion.active) explosion.destroy()
+        }
+      })
+
+      // 伤害敌人
+      this.scene.enemies.getChildren().forEach(enemy => {
+        if (!enemy.active) return
+        const dist = Phaser.Math.Distance.Between(ball.x, ball.y, enemy.x, enemy.y)
+        if (dist < 80) {
+          enemy.takeDamage(ball.damage)
+        }
+      })
+
+      ball.destroy()
+    })
+  }
+
+  abilityMolecularPrime(ability) {
+    const castX = this.x
+    const castY = this.y
+
+    // 扩散波
+    const wave = this.scene.add.circle(castX, castY, 10, 0xffaa00, 0.4)
+    wave.setDepth(50)
+
+    this.scene.tweens.add({
+      targets: wave,
+      scale: ability.range / 10,
+      duration: 1000,
+      onComplete: () => {
+        if (wave && wave.active) wave.destroy()
+      }
+    })
+
+    // 标记敌人
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(castX, castY, enemy.x, enemy.y)
+      if (dist < ability.range) {
+        enemy.primed = true
+        enemy.primedMultiplier = ability.damageMultiplier
+        enemy.primedExplosion = ability.explosionDamage
+        enemy.setTint(0xffaa00)
+
+        // 减速
+        if (enemy.stats) {
+          enemy.originalSpeed = enemy.stats.speed
+          enemy.stats.speed *= (1 - ability.slowPercent)
+        }
+
+        this.scene.time.delayedCall(ability.duration, () => {
+          if (enemy.active) {
+            enemy.primed = false
+            enemy.primedMultiplier = 1
+            enemy.clearTint()
+            enemy.setTint(enemy.enemyData.color)
+            if (enemy.originalSpeed) {
+              enemy.stats.speed = enemy.originalSpeed
+            }
+          }
+        })
+      }
+    })
+  }
+
+  // ========== Trinity 技能 ==========
+  abilityWellOfLife(ability) {
+    // 找最近敌人
+    let target = null
+    let nearestDist = Infinity
+
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y)
+      if (dist < nearestDist && dist < 500) {
+        nearestDist = dist
+        target = enemy
+      }
+    })
+
+    if (!target) return
+
+    target.wellOfLife = true
+    target.setTint(0x00ff00)
+
+    // 生命之井效果
+    const wellEffect = this.scene.add.circle(target.x, target.y, 30, 0x00ff00, 0.3)
+    wellEffect.setDepth(50)
+
+    const followTimer = this.scene.time.addEvent({
+      delay: 16,
+      callback: () => {
+        if (!target.active) return
+        wellEffect.setPosition(target.x, target.y)
+      },
+      loop: true
+    })
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      followTimer.destroy()
+      if (target.active) {
+        target.wellOfLife = false
+        target.clearTint()
+        target.setTint(target.enemyData.color)
+      }
+      if (wellEffect && wellEffect.active) wellEffect.destroy()
+    })
+  }
+
+  abilityEnergyVampire(ability) {
+    // 找最近敌人
+    let target = null
+    let nearestDist = Infinity
+
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y)
+      if (dist < nearestDist && dist < 500) {
+        nearestDist = dist
+        target = enemy
+      }
+    })
+
+    if (!target) return
+
+    target.setTint(0x00ffff)
+
+    // 脉冲恢复能量
+    let pulseCount = 0
+    const pulseTimer = this.scene.time.addEvent({
+      delay: ability.duration / ability.pulseCount,
+      callback: () => {
+        if (!target.active || !this.active) return
+
+        // 能量脉冲特效
+        const pulse = this.scene.add.circle(target.x, target.y, 10, 0x00ffff, 0.8)
+        pulse.setDepth(200)
+
+        this.scene.tweens.add({
+          targets: pulse,
+          x: this.x,
+          y: this.y,
+          scale: 0.5,
+          duration: 300,
+          onComplete: () => {
+            if (this.active) {
+              this.addEnergy(ability.energyPerPulse)
+            }
+            if (pulse && pulse.active) pulse.destroy()
+          }
+        })
+
+        pulseCount++
+        if (pulseCount >= ability.pulseCount) {
+          pulseTimer.destroy()
+          if (target.active) {
+            target.clearTint()
+            target.setTint(target.enemyData.color)
+          }
+        }
+      },
+      loop: true
+    })
+  }
+
+  abilityBlessing(ability) {
+    // 恢复生命
+    this.heal(this.stats.maxHealth * ability.healPercent)
+
+    // 祝福特效
+    const blessEffect = this.scene.add.circle(this.x, this.y, 50, 0x88ffaa, 0.5)
+    blessEffect.setDepth(200)
+
+    this.scene.tweens.add({
+      targets: blessEffect,
+      scale: 3,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => {
+        if (blessEffect && blessEffect.active) blessEffect.destroy()
+      }
+    })
+
+    // 伤害减免
+    this.blessingDR = ability.damageReduction
+    this.blessingActive = true
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      if (this.active) {
+        this.blessingDR = 0
+        this.blessingActive = false
+      }
+    })
+  }
+
+  // ========== Ash 技能 ==========
+  abilityShuriken(ability) {
+    const pointer = this.scene.input.activePointer
+    const worldPoint = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const baseAngle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y)
+
+    // 投掷多个手里剑
+    for (let i = 0; i < ability.projectileCount; i++) {
+      const angle = baseAngle + (i - (ability.projectileCount - 1) / 2) * 0.2
+
+      const shuriken = this.scene.add.star(this.x, this.y, 4, 5, 12, 0xaaaaaa)
+      shuriken.setDepth(200)
+
+      const speed = 800
+      const vx = Math.cos(angle) * speed
+      const vy = Math.sin(angle) * speed
+
+      const moveTimer = this.scene.time.addEvent({
+        delay: 16,
+        callback: () => {
+          if (!shuriken.active) return
+          shuriken.x += vx * 0.016
+          shuriken.y += vy * 0.016
+          shuriken.rotation += 0.3
+
+          // 检测命中
+          this.scene.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active) return
+            const dist = Phaser.Math.Distance.Between(shuriken.x, shuriken.y, enemy.x, enemy.y)
+            if (dist < 30) {
+              enemy.takeDamage(ability.damage)
+              // 流血效果
+              enemy.bleeding = true
+              enemy.bleedDamage = ability.bleedDamage
+              enemy.bleedEnd = this.scene.time.now + ability.bleedDuration
+              shuriken.destroy()
+              moveTimer.destroy()
+            }
+          })
+        },
+        loop: true
+      })
+
+      this.scene.time.delayedCall(1000, () => {
+        moveTimer.destroy()
+        if (shuriken && shuriken.active) shuriken.destroy()
+      })
+    }
+  }
+
+  abilitySmokeScreen(ability) {
+    const castX = this.x
+    const castY = this.y
+
+    // 烟雾效果
+    const smoke = this.scene.add.circle(castX, castY, ability.range, 0x444444, 0.6)
+    smoke.setDepth(50)
+
+    // 眩晕范围内敌人
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(castX, castY, enemy.x, enemy.y)
+      if (dist < ability.range) {
+        enemy.stun(ability.stunDuration)
+      }
+    })
+
+    // 隐身
+    this.isInvisible = true
+    this.setAlpha(0.3)
+
+    this.scene.tweens.add({
+      targets: smoke,
+      alpha: 0,
+      duration: ability.duration,
+      onComplete: () => {
+        if (smoke && smoke.active) smoke.destroy()
+      }
+    })
+
+    this.scene.time.delayedCall(ability.duration, () => {
+      if (this.active) {
+        this.isInvisible = false
+        this.setAlpha(1)
+      }
+    })
+  }
+
+  abilityBladeStorm(ability) {
+    // 收集目标
+    const targets = []
+    this.scene.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y)
+      if (dist < 400 && targets.length < ability.maxTargets) {
+        targets.push(enemy)
+        // 标记目标
+        enemy.setTint(0xff0000)
+      }
+    })
+
+    if (targets.length === 0) return
+
+    // 无敌
+    this.invincibleTime = targets.length * ability.hitsPerTarget * 200 + 500
+    this.setAlpha(0.5)
+
+    // 依次攻击每个目标
+    let attackIndex = 0
+    const totalAttacks = targets.length * ability.hitsPerTarget
+
+    const attackTimer = this.scene.time.addEvent({
+      delay: 150,
+      callback: () => {
+        if (!this.active || attackIndex >= totalAttacks) {
+          attackTimer.destroy()
+          if (this.active) this.setAlpha(1)
+          return
+        }
+
+        const targetIndex = Math.floor(attackIndex / ability.hitsPerTarget)
+        const target = targets[targetIndex]
+
+        if (target && target.active) {
+          // 瞬移到目标
+          this.x = target.x + (Math.random() - 0.5) * 50
+          this.y = target.y
+
+          // 斩击特效
+          const slash = this.scene.add.graphics()
+          slash.lineStyle(3, 0xffffff, 1)
+          slash.lineBetween(this.x - 30, this.y - 20, this.x + 30, this.y + 20)
+          slash.setDepth(200)
+
+          this.scene.tweens.add({
+            targets: slash,
+            alpha: 0,
+            duration: 100,
+            onComplete: () => {
+              if (slash && slash.active) slash.destroy()
+            }
+          })
+
+          target.takeDamage(ability.damagePerHit)
+        }
+
+        attackIndex++
+
+        // 清除标记
+        if (attackIndex % ability.hitsPerTarget === 0 && target && target.active) {
+          target.clearTint()
+          target.setTint(target.enemyData.color)
+        }
+      },
+      loop: true
+    })
   }
 }

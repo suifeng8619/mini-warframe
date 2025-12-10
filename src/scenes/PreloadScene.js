@@ -51,6 +51,11 @@ export class PreloadScene extends Phaser.Scene {
     this.generateWarframeSprite('excalibur', 0x4488ff)
     this.generateWarframeSprite('volt', 0xffff44)
     this.generateWarframeSprite('mag', 0xff44ff)
+    this.generateWarframeSprite('rhino', 0x888888)
+    this.generateWarframeSprite('loki', 0x44aaff)
+    this.generateWarframeSprite('nova', 0xffaa00)
+    this.generateWarframeSprite('trinity', 0x88ffaa)
+    this.generateWarframeSprite('ash', 0x444444)
 
     // 生成武器弹药
     this.generateBulletSprite('bullet_normal', 0x00ccff, 12, 4)
