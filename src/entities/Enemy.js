@@ -140,6 +140,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       case 'charger':
         this.chargerBehavior(time, distToPlayer)
         break
+      case 'grappler':
+        this.grapplerBehavior(time, distToPlayer)
+        break
+      case 'summoner':
+        this.summonerBehavior(time, distToPlayer)
+        break
+      case 'flying':
+        this.flyingBehavior(time, distToPlayer)
+        break
+      case 'leaper':
+        this.leaperBehavior(time, distToPlayer)
+        break
     }
 
     // 面向目标（已确认target存在且活跃）
@@ -250,6 +262,242 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           this.lastAttackTime = time
         }
       }
+    }
+  }
+
+  // 钩爪型AI (Scorpion)
+  grapplerBehavior(time, distToPlayer) {
+    if (!this.target || !this.target.active) return
+
+    const grappleRange = this.enemyData.grappleRange || 250
+
+    if (distToPlayer > this.stats.detectionRange) {
+      this.aiState = 'idle'
+      this.setVelocityX(0)
+    } else if (distToPlayer <= grappleRange && distToPlayer > this.stats.attackRange) {
+      // 在钩爪范围内，发射钩爪
+      this.aiState = 'grapple'
+      this.setVelocityX(0)
+
+      if (time - this.lastAttackTime >= this.stats.attackRate) {
+        this.grappleAttack()
+        this.lastAttackTime = time
+      }
+    } else if (distToPlayer > grappleRange) {
+      // 追击到钩爪范围
+      this.aiState = 'chase'
+      const chaseDir = this.x < this.target.x ? 1 : -1
+      this.setVelocityX(this.stats.speed * chaseDir)
+    } else {
+      // 近战攻击
+      this.aiState = 'attack'
+      if (time - this.lastAttackTime >= this.stats.attackRate) {
+        this.meleeAttack()
+        this.lastAttackTime = time
+      }
+    }
+  }
+
+  grappleAttack() {
+    if (!this.target || !this.target.active) return
+
+    const pullForce = this.enemyData.pullForce || 400
+
+    // 钩爪特效
+    const grappleLine = this.scene.add.graphics()
+    grappleLine.lineStyle(3, 0xff6600, 1)
+    grappleLine.lineBetween(this.x, this.y, this.target.x, this.target.y)
+    grappleLine.setDepth(150)
+
+    // 拉拽玩家
+    if (this.target.body) {
+      const angle = Phaser.Math.Angle.Between(this.target.x, this.target.y, this.x, this.y)
+      this.target.body.velocity.x += Math.cos(angle) * pullForce
+      this.target.body.velocity.y += Math.sin(angle) * pullForce * 0.5
+    }
+
+    // 造成伤害
+    this.target.takeDamage(this.stats.damage * 0.5)
+
+    this.scene.tweens.add({
+      targets: grappleLine,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => {
+        if (grappleLine && grappleLine.active) grappleLine.destroy()
+      }
+    })
+  }
+
+  // 召唤型AI (Tech, Brood Mother)
+  summonerBehavior(time, distToPlayer) {
+    if (!this.target || !this.target.active) return
+
+    if (distToPlayer > this.stats.detectionRange) {
+      this.aiState = 'idle'
+      this.setVelocityX(0)
+    } else {
+      // 保持距离
+      const optimalRange = this.stats.attackRange * 0.8
+      if (distToPlayer < optimalRange * 0.5) {
+        // 太近，后退
+        const retreatDir = this.x < this.target.x ? -1 : 1
+        this.setVelocityX(this.stats.speed * retreatDir)
+      } else if (distToPlayer > optimalRange) {
+        // 追击
+        const chaseDir = this.x < this.target.x ? 1 : -1
+        this.setVelocityX(this.stats.speed * 0.5 * chaseDir)
+      } else {
+        this.setVelocityX(0)
+      }
+
+      // 召唤
+      const summonCooldown = this.enemyData.summonCooldown || 8000
+      if (!this.lastSummonTime) this.lastSummonTime = 0
+      if (!this.summonCount) this.summonCount = 0
+
+      const maxSummons = this.enemyData.maxSummons || 2
+
+      if (time - this.lastSummonTime >= summonCooldown && this.summonCount < maxSummons) {
+        this.summonMinion()
+        this.lastSummonTime = time
+      }
+
+      // 远程攻击
+      if (time - this.lastAttackTime >= this.stats.attackRate) {
+        this.rangedAttack()
+        this.lastAttackTime = time
+      }
+    }
+  }
+
+  summonMinion() {
+    const summonType = this.enemyData.summonType || 'runner'
+    const maxSummons = this.enemyData.maxSummons || 2
+
+    // 检查当前召唤数量
+    if (this.summonCount >= maxSummons) return
+
+    // 召唤特效
+    const summonEffect = this.scene.add.circle(this.x, this.y, 30, 0x00ff00, 0.5)
+    summonEffect.setDepth(100)
+
+    this.scene.tweens.add({
+      targets: summonEffect,
+      scale: 2,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => {
+        if (summonEffect && summonEffect.active) summonEffect.destroy()
+      }
+    })
+
+    // 创建召唤物
+    const spawnX = this.x + (Math.random() - 0.5) * 100
+    const spawnY = this.y
+
+    // 导入Enemy类需要通过scene来创建
+    const minion = new Enemy(this.scene, spawnX, spawnY, summonType, this.level)
+    this.scene.enemies.add(minion)
+
+    this.summonCount++
+
+    // 标记召唤物，死亡时减少计数
+    minion.summoner = this
+    minion.isSummoned = true
+  }
+
+  // 飞行型AI (Osprey)
+  flyingBehavior(time, distToPlayer) {
+    if (!this.target || !this.target.active) return
+
+    const hoverHeight = this.enemyData.hoverHeight || 100
+
+    // 禁用重力
+    if (this.body) {
+      this.body.setAllowGravity(false)
+    }
+
+    if (distToPlayer > this.stats.detectionRange) {
+      this.aiState = 'idle'
+      // 悬停
+      this.setVelocity(0, Math.sin(time / 500) * 20)
+    } else {
+      // 在玩家上方盘旋
+      const targetX = this.target.x + (Math.random() - 0.5) * 100
+      const targetY = this.target.y - hoverHeight
+
+      const dx = targetX - this.x
+      const dy = targetY - this.y
+
+      // 平滑移动
+      this.setVelocityX(dx * 2)
+      this.setVelocityY(dy * 2 + Math.sin(time / 300) * 30)
+
+      // 攻击
+      if (distToPlayer < this.stats.attackRange) {
+        if (time - this.lastAttackTime >= this.stats.attackRate) {
+          this.rangedAttack()
+          this.lastAttackTime = time
+        }
+      }
+    }
+  }
+
+  // 跳跃型AI (Leaper)
+  leaperBehavior(time, distToPlayer) {
+    if (!this.target || !this.target.active) return
+
+    const leapRange = this.enemyData.leapRange || 200
+
+    if (distToPlayer > this.stats.detectionRange) {
+      this.aiState = 'idle'
+      // 巡逻
+      if (!this.patrolDir) this.patrolDir = 1
+      this.setVelocityX(this.stats.speed * 0.3 * this.patrolDir)
+      if (this.body) {
+        if (this.body.blocked.left) this.patrolDir = 1
+        if (this.body.blocked.right) this.patrolDir = -1
+      }
+    } else if (distToPlayer <= leapRange && this.body && this.body.blocked.down) {
+      // 跳跃攻击
+      this.aiState = 'leap'
+
+      if (!this.isLeaping) {
+        this.isLeaping = true
+
+        const angle = Phaser.Math.Angle.Between(this.x, this.y, this.target.x, this.target.y)
+        const leapSpeed = 500
+
+        this.setVelocity(
+          Math.cos(angle) * leapSpeed,
+          Math.sin(angle) * leapSpeed - 300
+        )
+
+        // 跳跃攻击伤害加成
+        this.leapDamageMultiplier = this.enemyData.leapDamageMultiplier || 1.5
+
+        this.scene.time.delayedCall(500, () => {
+          this.isLeaping = false
+          this.leapDamageMultiplier = 1
+        })
+      }
+
+      // 攻击
+      if (distToPlayer < this.stats.attackRange) {
+        if (time - this.lastAttackTime >= this.stats.attackRate) {
+          const originalDamage = this.stats.damage
+          this.stats.damage *= (this.leapDamageMultiplier || 1)
+          this.meleeAttack()
+          this.stats.damage = originalDamage
+          this.lastAttackTime = time
+        }
+      }
+    } else {
+      // 追击
+      this.aiState = 'chase'
+      const chaseDir = this.x < this.target.x ? 1 : -1
+      this.setVelocityX(this.stats.speed * chaseDir)
     }
   }
 
@@ -432,6 +680,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           enemy.auraSource = null
         }
       })
+    }
+
+    // 如果是召唤物，减少召唤者的计数
+    if (this.isSummoned && this.summoner && this.summoner.active) {
+      this.summoner.summonCount = Math.max(0, (this.summoner.summonCount || 1) - 1)
     }
 
     // 掉落
