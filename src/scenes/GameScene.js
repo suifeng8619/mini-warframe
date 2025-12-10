@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { Warframe } from '../entities/Warframe.js'
 import { Enemy } from '../entities/Enemy.js'
+import { Boss } from '../entities/Boss.js'
 import { WAVE_CONFIG, getRandomEnemyType } from '../data/enemies.js'
 
 export class GameScene extends Phaser.Scene {
@@ -427,32 +428,92 @@ export class GameScene extends Phaser.Scene {
   startWave() {
     this.waveComplete = false
     this.enemiesSpawned = 0
-    this.enemiesThisWave = WAVE_CONFIG.baseEnemyCount + (this.waveNumber - 1) * WAVE_CONFIG.enemyCountPerWave
+    this.bossDefeated = false
+    this.currentBoss = null
 
-    // 波次开始提示
-    this.showWaveAnnouncement()
+    // 检查是否是Boss波次
+    const bossType = WAVE_CONFIG.getBossWave(this.waveNumber)
 
-    // 开始生成敌人
-    this.spawnTimer = this.time.addEvent({
-      delay: WAVE_CONFIG.spawnInterval,
-      callback: this.spawnEnemy,
-      callbackScope: this,
-      loop: true
+    if (bossType) {
+      // Boss波次
+      this.enemiesThisWave = 0 // Boss波次不生成普通敌人
+      this.showWaveAnnouncement(true, bossType)
+
+      // 延迟生成Boss
+      this.time.delayedCall(2000, () => {
+        this.spawnBoss(bossType)
+      })
+    } else {
+      // 普通波次
+      this.enemiesThisWave = WAVE_CONFIG.baseEnemyCount + (this.waveNumber - 1) * WAVE_CONFIG.enemyCountPerWave
+
+      // 波次开始提示
+      this.showWaveAnnouncement()
+
+      // 开始生成敌人
+      this.spawnTimer = this.time.addEvent({
+        delay: WAVE_CONFIG.spawnInterval,
+        callback: this.spawnEnemy,
+        callbackScope: this,
+        loop: true
+      })
+    }
+  }
+
+  spawnBoss(bossType) {
+    // Boss在地图中央生成
+    const spawnX = this.levelWidth / 2
+    const spawnY = this.levelHeight - 200
+
+    this.currentBoss = new Boss(this, spawnX, spawnY, bossType)
+    this.enemies.add(this.currentBoss)
+
+    // Boss警告特效
+    const warning = this.add.text(640, 300, 'WARNING: BOSS INCOMING!', {
+      fontFamily: 'Arial Black',
+      fontSize: '48px',
+      color: '#ff0000',
+      stroke: '#000000',
+      strokeThickness: 4
+    })
+    warning.setOrigin(0.5)
+    warning.setScrollFactor(0)
+    warning.setDepth(500)
+
+    this.tweens.add({
+      targets: warning,
+      alpha: 0,
+      y: 280,
+      duration: 2000,
+      onComplete: () => {
+        if (warning && warning.active) warning.destroy()
+      }
     })
   }
 
-  showWaveAnnouncement() {
+  showWaveAnnouncement(isBossWave = false, bossType = null) {
     // 先销毁旧的文本（如果存在）
     if (this.waveAnnouncementText) {
       this.waveAnnouncementText.destroy()
     }
 
-    const text = this.add.text(640, 200, `WAVE ${this.waveNumber}`, {
+    let displayText = `WAVE ${this.waveNumber}`
+    let color = '#00ccff'
+    let strokeColor = '#003344'
+
+    if (isBossWave && bossType) {
+      displayText = `WAVE ${this.waveNumber}\nBOSS BATTLE!`
+      color = '#ff4444'
+      strokeColor = '#440000'
+    }
+
+    const text = this.add.text(640, 200, displayText, {
       fontFamily: 'Arial Black',
-      fontSize: '64px',
-      color: '#00ccff',
-      stroke: '#003344',
-      strokeThickness: 4
+      fontSize: isBossWave ? '48px' : '64px',
+      color: color,
+      stroke: strokeColor,
+      strokeThickness: 4,
+      align: 'center'
     })
     text.setOrigin(0.5)
     text.setScrollFactor(0)
@@ -550,6 +611,33 @@ export class GameScene extends Phaser.Scene {
   }
 
   checkWaveComplete() {
+    // Boss波次检查
+    if (this.currentBoss) {
+      if (this.bossDefeated || !this.currentBoss.active) {
+        this.waveComplete = true
+        this.waveNumber++
+        this.currentBoss = null
+
+        // 更新最高波次记录
+        if (this.waveNumber > window.GAME_STATE.highScore) {
+          window.GAME_STATE.highScore = this.waveNumber
+          this.saveGame()
+        }
+
+        // 显示波次完成
+        this.showWaveComplete()
+
+        // 延迟后开始下一波
+        this.time.delayedCall(WAVE_CONFIG.waveBreakTime + 2000, () => {
+          if (!this.isGameOver) {
+            this.startWave()
+          }
+        })
+      }
+      return
+    }
+
+    // 普通波次检查
     if (this.enemies.countActive() === 0 && this.enemiesSpawned >= this.enemiesThisWave) {
       this.waveComplete = true
       this.waveNumber++

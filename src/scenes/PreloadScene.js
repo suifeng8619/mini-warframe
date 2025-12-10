@@ -79,9 +79,9 @@ export class PreloadScene extends Phaser.Scene {
     this.generateEnemySprite('infested_special', 0x557733)// 特殊感染
 
     // 生成Boss精灵
-    this.generateBossSprite('boss_vor', 0xffcc00)     // Vor上尉
-    this.generateBossSprite('boss_jackal', 0x4488ff)  // 豺狼
-    this.generateBossSprite('boss_phorid', 0x66dd44)  // 恐惧之源
+    this.generateBossSprite('boss_captain_vor', 0xffcc00)  // Vor上尉
+    this.generateBossSprite('boss_jackal', 0x4488ff)       // 豺狼
+    this.generateBossSprite('boss_phorid', 0x66dd44)       // 恐惧之源
 
     // 生成敌人弹药
     this.generateBulletSprite('enemy_bullet', 0xff4444, 8, 4)
