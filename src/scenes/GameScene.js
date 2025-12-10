@@ -259,6 +259,16 @@ export class GameScene extends Phaser.Scene {
 
     enemy.takeDamage(damage, isCrit)
 
+    // AOE爆炸效果（如Opticor）
+    if (bullet.aoeRadius && bullet.aoeRadius > 0) {
+      this.createAoeExplosion(bullet.x, bullet.y, bullet.aoeRadius, damage * 0.5)
+    }
+
+    // 连锁效果（如Amprex、Atomos）
+    if (bullet.chainCount && bullet.chainCount > 0) {
+      this.createChainLightning(enemy, bullet.chainCount, bullet.chainRange || 100, damage * 0.7)
+    }
+
     // 穿透逻辑
     if (bullet.punchThrough && bullet.punchThrough > 0) {
       bullet.punchThrough--
@@ -281,6 +291,76 @@ export class GameScene extends Phaser.Scene {
         }
       }
     })
+  }
+
+  // AOE爆炸效果
+  createAoeExplosion(x, y, radius, damage) {
+    // 视觉效果
+    const explosion = this.add.circle(x, y, radius, 0x00ff00, 0.5)
+    explosion.setDepth(150)
+    this.tweens.add({
+      targets: explosion,
+      alpha: 0,
+      scale: 1.5,
+      duration: 300,
+      onComplete: () => {
+        if (explosion && explosion.active) {
+          explosion.destroy()
+        }
+      }
+    })
+
+    // 对范围内敌人造成伤害
+    this.enemies.getChildren().forEach(enemy => {
+      if (!enemy.active) return
+      const dist = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y)
+      if (dist <= radius) {
+        enemy.takeDamage(damage, false)
+      }
+    })
+  }
+
+  // 连锁闪电效果
+  createChainLightning(sourceEnemy, chainCount, chainRange, damage) {
+    const hitEnemies = new Set([sourceEnemy])
+    let currentTarget = sourceEnemy
+
+    for (let i = 0; i < chainCount; i++) {
+      let nearestEnemy = null
+      let nearestDist = chainRange
+
+      // 查找最近的未被击中的敌人
+      this.enemies.getChildren().forEach(enemy => {
+        if (!enemy.active || hitEnemies.has(enemy)) return
+        const dist = Phaser.Math.Distance.Between(currentTarget.x, currentTarget.y, enemy.x, enemy.y)
+        if (dist < nearestDist) {
+          nearestDist = dist
+          nearestEnemy = enemy
+        }
+      })
+
+      if (!nearestEnemy) break
+
+      // 绘制连锁特效
+      const lightning = this.add.graphics()
+      lightning.lineStyle(3, 0x00ffff, 0.8)
+      lightning.lineBetween(currentTarget.x, currentTarget.y, nearestEnemy.x, nearestEnemy.y)
+      lightning.setDepth(150)
+
+      this.tweens.add({
+        targets: lightning,
+        alpha: 0,
+        duration: 150,
+        onComplete: () => {
+          if (lightning) lightning.destroy()
+        }
+      })
+
+      // 对连锁目标造成伤害
+      nearestEnemy.takeDamage(damage, false)
+      hitEnemies.add(nearestEnemy)
+      currentTarget = nearestEnemy
+    }
   }
 
   bulletHitPlayer(bullet, player) {

@@ -96,6 +96,173 @@ export const WEAPONS = {
       spread: 0.3  // 散布角度
     },
     color: 0x66ff66
+  },
+
+  // ========== 新增武器 ==========
+  soma: {
+    id: 'soma',
+    name: 'Soma',
+    displayName: '索玛',
+    type: 'rifle',
+    description: '高暴击率全自动步枪',
+    baseStats: {
+      damage: 12,
+      fireRate: 15,
+      magazineSize: 100,
+      reloadTime: 3000,
+      accuracy: 0.95,
+      critChance: 0.30,
+      critMultiplier: 3.0,
+      projectileSpeed: 1200
+    },
+    color: 0xffffff
+  },
+
+  tigris: {
+    id: 'tigris',
+    name: 'Tigris',
+    displayName: '猛虎',
+    type: 'shotgun',
+    description: '双管霰弹枪，单发高伤',
+    baseStats: {
+      damage: 150,
+      pellets: 5,
+      fireRate: 2.0,
+      magazineSize: 2,
+      reloadTime: 1800,
+      accuracy: 0.4,
+      critChance: 0.10,
+      critMultiplier: 2.0,
+      projectileSpeed: 700,
+      spread: 0.4
+    },
+    color: 0x8844aa
+  },
+
+  aklex: {
+    id: 'aklex',
+    name: 'Aklex',
+    displayName: '双持雷克斯',
+    type: 'pistol',
+    description: '双持版雷克斯，火力翻倍',
+    baseStats: {
+      damage: 110,
+      fireRate: 2.67,
+      magazineSize: 12,
+      reloadTime: 3000,
+      accuracy: 0.93,
+      critChance: 0.20,
+      critMultiplier: 2.0,
+      projectileSpeed: 1400
+    },
+    color: 0xdddddd
+  },
+
+  dread: {
+    id: 'dread',
+    name: 'Dread',
+    displayName: '恐惧',
+    type: 'bow',
+    description: '高暴击弓箭，需蓄力',
+    baseStats: {
+      damage: 200,
+      fireRate: 1.0,
+      magazineSize: 1,
+      reloadTime: 600,
+      accuracy: 1.0,
+      critChance: 0.50,
+      critMultiplier: 2.0,
+      projectileSpeed: 600,
+      chargeTime: 500,
+      punchThrough: 3
+    },
+    color: 0x220000
+  },
+
+  amprex: {
+    id: 'amprex',
+    name: 'Amprex',
+    displayName: '安培克斯',
+    type: 'rifle',
+    description: '电击光束枪，可连锁',
+    baseStats: {
+      damage: 22,
+      fireRate: 12,
+      magazineSize: 100,
+      reloadTime: 2700,
+      accuracy: 0.8,
+      critChance: 0.32,
+      critMultiplier: 2.2,
+      projectileSpeed: 2000,
+      chainCount: 3,
+      chainRange: 100
+    },
+    color: 0x00ffff
+  },
+
+  kohm: {
+    id: 'kohm',
+    name: 'Kohm',
+    displayName: '寇恩',
+    type: 'shotgun',
+    description: '全自动霰弹枪，弹丸递增',
+    baseStats: {
+      damage: 30,
+      pellets: 12,
+      fireRate: 3.67,
+      magazineSize: 245,
+      reloadTime: 2000,
+      accuracy: 0.5,
+      critChance: 0.11,
+      critMultiplier: 2.3,
+      projectileSpeed: 800,
+      spread: 0.5,
+      spoolUp: true // 射速随射击递增
+    },
+    color: 0xff6644
+  },
+
+  atomos: {
+    id: 'atomos',
+    name: 'Atomos',
+    displayName: '原子矿融炮',
+    type: 'pistol',
+    description: '热能光束手枪，可连锁',
+    baseStats: {
+      damage: 50,
+      fireRate: 8,
+      magazineSize: 70,
+      reloadTime: 2000,
+      accuracy: 1.0,
+      critChance: 0.15,
+      critMultiplier: 1.7,
+      projectileSpeed: 1500,
+      chainCount: 3,
+      chainRange: 80
+    },
+    color: 0xff4400
+  },
+
+  opticor: {
+    id: 'opticor',
+    name: 'Opticor',
+    displayName: '奥堤克光子枪',
+    type: 'rifle',
+    description: '蓄力激光炮，超高伤害',
+    baseStats: {
+      damage: 1000,
+      fireRate: 0.5,
+      magazineSize: 5,
+      reloadTime: 2500,
+      accuracy: 1.0,
+      critChance: 0.20,
+      critMultiplier: 2.5,
+      projectileSpeed: 3000,
+      chargeTime: 2000,
+      punchThrough: 5,
+      aoeRadius: 50
+    },
+    color: 0x00ff00
   }
 }
 

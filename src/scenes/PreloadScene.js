@@ -61,6 +61,9 @@ export class PreloadScene extends Phaser.Scene {
     this.generateBulletSprite('bullet_normal', 0x00ccff, 12, 4)
     this.generateBulletSprite('bullet_shotgun', 0x66ff66, 8, 8)
     this.generateBulletSprite('bullet_energy', 0xff44ff, 10, 10)
+    this.generateBulletSprite('bullet_arrow', 0x220000, 20, 3)  // 弓箭
+    this.generateBulletSprite('bullet_beam', 0x00ffff, 30, 6)   // 光束武器
+    this.generateBulletSprite('bullet_laser', 0x00ff00, 40, 8)  // 激光炮
 
     // 生成敌人精灵
     this.generateEnemySprite('grineer', 0xcc4444)

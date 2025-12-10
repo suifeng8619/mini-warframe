@@ -329,7 +329,23 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
   }
 
   createBullet(angle, weaponStats) {
-    const bullet = this.scene.playerBullets.get(this.x, this.y, 'bullet_normal')
+    // 根据武器类型选择子弹精灵
+    let bulletSprite = 'bullet_normal'
+    const weaponType = this.weaponData?.type
+
+    if (weaponType === 'shotgun') {
+      bulletSprite = 'bullet_shotgun'
+    } else if (weaponType === 'bow') {
+      bulletSprite = 'bullet_arrow'
+    } else if (weaponStats.chainCount) {
+      // 连锁武器使用光束精灵
+      bulletSprite = 'bullet_beam'
+    } else if (weaponStats.chargeTime && weaponStats.aoeRadius) {
+      // 蓄力AOE武器使用激光精灵
+      bulletSprite = 'bullet_laser'
+    }
+
+    const bullet = this.scene.playerBullets.get(this.x, this.y, bulletSprite)
 
     if (bullet) {
       bullet.setActive(true)
@@ -347,6 +363,9 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
       bullet.critChance = weaponStats.critChance
       bullet.critMultiplier = weaponStats.critMultiplier
       bullet.punchThrough = weaponStats.punchThrough || 0
+      bullet.chainCount = weaponStats.chainCount || 0
+      bullet.chainRange = weaponStats.chainRange || 0
+      bullet.aoeRadius = weaponStats.aoeRadius || 0
 
       // 子弹存活时间 - 子弹的定时器不需要保存引用
       // 因为当子弹被回收到池中或场景销毁时，定时器会自动清理
