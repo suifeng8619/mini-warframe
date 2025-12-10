@@ -39,16 +39,24 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5)
 
     // 菜单按钮
-    this.createMenuButton(width / 2, height * 0.5, '开始任务', () => {
-      this.scene.start('GameScene')
+    this.createMenuButton(width / 2, height * 0.45, '星图导航', () => {
+      this.scene.start('NavigationScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.58, '军械库', () => {
+    this.createMenuButton(width / 2, height * 0.53, '军械库', () => {
       this.scene.start('ArsenalScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.66, 'MOD配置', () => {
+    this.createMenuButton(width / 2, height * 0.61, 'MOD配置', () => {
       this.scene.start('ModScene')
+    })
+
+    this.createMenuButton(width / 2, height * 0.69, '铸造厂', () => {
+      this.scene.start('FoundryScene')
+    })
+
+    this.createMenuButton(width / 2, height * 0.77, '商店', () => {
+      this.scene.start('ShopScene')
     })
 
     // 显示当前装备信息

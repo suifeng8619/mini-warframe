@@ -6,6 +6,9 @@ import { GameScene } from './scenes/GameScene.js'
 import { UIScene } from './scenes/UIScene.js'
 import { ModScene } from './scenes/ModScene.js'
 import { ArsenalScene } from './scenes/ArsenalScene.js'
+import { FoundryScene } from './scenes/FoundryScene.js'
+import { ShopScene } from './scenes/ShopScene.js'
+import { NavigationScene } from './scenes/NavigationScene.js'
 
 const config = {
   type: Phaser.AUTO,
@@ -20,7 +23,7 @@ const config = {
       debug: false
     }
   },
-  scene: [BootScene, PreloadScene, MenuScene, ArsenalScene, ModScene, GameScene, UIScene],
+  scene: [BootScene, PreloadScene, MenuScene, ArsenalScene, ModScene, FoundryScene, ShopScene, NavigationScene, GameScene, UIScene],
   pixelArt: false,
   antialias: true,
   scale: {
