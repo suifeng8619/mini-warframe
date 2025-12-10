@@ -9,6 +9,11 @@ import { ArsenalScene } from './scenes/ArsenalScene.js'
 import { FoundryScene } from './scenes/FoundryScene.js'
 import { ShopScene } from './scenes/ShopScene.js'
 import { NavigationScene } from './scenes/NavigationScene.js'
+import { SettingsScene } from './scenes/SettingsScene.js'
+import { getAudioManager } from './systems/AudioManager.js'
+
+// 初始化音效管理器（全局单例）
+window.audioManager = getAudioManager()
 
 const config = {
   type: Phaser.AUTO,
@@ -23,7 +28,7 @@ const config = {
       debug: false
     }
   },
-  scene: [BootScene, PreloadScene, MenuScene, ArsenalScene, ModScene, FoundryScene, ShopScene, NavigationScene, GameScene, UIScene],
+  scene: [BootScene, PreloadScene, MenuScene, ArsenalScene, ModScene, FoundryScene, ShopScene, NavigationScene, SettingsScene, GameScene, UIScene],
   pixelArt: false,
   antialias: true,
   scale: {
