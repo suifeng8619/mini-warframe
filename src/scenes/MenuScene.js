@@ -38,25 +38,30 @@ export class MenuScene extends Phaser.Scene {
       color: '#88aacc'
     }).setOrigin(0.5)
 
-    // 菜单按钮
-    this.createMenuButton(width / 2, height * 0.45, '星图导航', () => {
+    // 菜单按钮 - 调整间距使其更紧凑
+    this.createMenuButton(width / 2, height * 0.42, '星图导航', () => {
       this.scene.start('NavigationScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.53, '军械库', () => {
+    this.createMenuButton(width / 2, height * 0.50, '军械库', () => {
       this.scene.start('ArsenalScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.61, 'MOD配置', () => {
+    this.createMenuButton(width / 2, height * 0.58, 'MOD配置', () => {
       this.scene.start('ModScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.69, '铸造厂', () => {
+    this.createMenuButton(width / 2, height * 0.66, '铸造厂', () => {
       this.scene.start('FoundryScene')
     })
 
-    this.createMenuButton(width / 2, height * 0.77, '商店', () => {
+    this.createMenuButton(width / 2, height * 0.74, '商店', () => {
       this.scene.start('ShopScene')
+    })
+
+    // 设置按钮 - 放在右下角
+    this.createSmallButton(width - 80, height - 40, '设置', () => {
+      this.scene.start('SettingsScene')
     })
 
     // 显示当前装备信息
@@ -144,7 +149,62 @@ export class MenuScene extends Phaser.Scene {
       buttonText.setColor('#00ccff')
     })
 
-    button.on('pointerdown', callback)
+    button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
+
+    return button
+  }
+
+  createSmallButton(x, y, text, callback) {
+    const button = this.add.container(x, y)
+
+    // 按钮背景
+    const bg = this.add.graphics()
+    bg.fillStyle(0x223344, 0.8)
+    bg.fillRoundedRect(-50, -18, 100, 36, 6)
+    bg.lineStyle(2, 0x4488aa, 1)
+    bg.strokeRoundedRect(-50, -18, 100, 36, 6)
+
+    // 按钮文字
+    const buttonText = this.add.text(0, 0, text, {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#88aacc'
+    }).setOrigin(0.5)
+
+    button.add([bg, buttonText])
+    button.setSize(100, 36)
+    button.setInteractive()
+
+    // 悬停效果
+    button.on('pointerover', () => {
+      bg.clear()
+      bg.fillStyle(0x335566, 0.9)
+      bg.fillRoundedRect(-50, -18, 100, 36, 6)
+      bg.lineStyle(2, 0x66aacc, 1)
+      bg.strokeRoundedRect(-50, -18, 100, 36, 6)
+      buttonText.setColor('#ffffff')
+    })
+
+    button.on('pointerout', () => {
+      bg.clear()
+      bg.fillStyle(0x223344, 0.8)
+      bg.fillRoundedRect(-50, -18, 100, 36, 6)
+      bg.lineStyle(2, 0x4488aa, 1)
+      bg.strokeRoundedRect(-50, -18, 100, 36, 6)
+      buttonText.setColor('#88aacc')
+    })
+
+    button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
 
     return button
   }

@@ -27,8 +27,25 @@ export class ModScene extends Phaser.Scene {
       this.saveAndExit()
     })
 
+    // 升级按钮
+    this.createButton(250, 40, '升级MOD', () => {
+      this.showUpgradePanel()
+    })
+
+    // Endo显示
+    this.endoText = this.add.text(width - 150, 40, '', {
+      fontFamily: 'Arial',
+      fontSize: '14px',
+      color: '#88aacc'
+    }).setOrigin(0.5)
+    this.updateEndoDisplay()
+
     // 当前配置类型
     this.configType = 'warframe' // warframe 或 weapon
+
+    // 升级面板相关
+    this.upgradePanel = null
+    this.selectedUpgradeMod = null
 
     // 切换标签
     this.createTabs()
@@ -61,6 +78,11 @@ export class ModScene extends Phaser.Scene {
     this.updateDisplay()
   }
 
+  updateEndoDisplay() {
+    const endo = window.GAME_STATE.inventory?.endo || 0
+    this.endoText.setText(`Endo: ${endo.toLocaleString()}`)
+  }
+
   createTabs() {
     const startX = 200
     const y = 100
@@ -78,7 +100,12 @@ export class ModScene extends Phaser.Scene {
     this.warframeTab.add([wfBg, wfText])
     this.warframeTab.setSize(160, 40)
     this.warframeTab.setInteractive()
-    this.warframeTab.on('pointerdown', () => this.switchTab('warframe'))
+    this.warframeTab.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      this.switchTab('warframe')
+    })
     this.warframeTabBg = wfBg
 
     // 武器标签
@@ -94,7 +121,12 @@ export class ModScene extends Phaser.Scene {
     this.weaponTab.add([wpBg, wpText])
     this.weaponTab.setSize(160, 40)
     this.weaponTab.setInteractive()
-    this.weaponTab.on('pointerdown', () => this.switchTab('weapon'))
+    this.weaponTab.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      this.switchTab('weapon')
+    })
     this.weaponTabBg = wpBg
     this.weaponTabText = wpText
     this.warframeTabText = wfText
@@ -169,6 +201,9 @@ export class ModScene extends Phaser.Scene {
       slot.equippedMod = null
 
       slot.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
         this.selectSlot(i)
       })
 
@@ -335,6 +370,9 @@ export class ModScene extends Phaser.Scene {
       container.modData = mod
 
       container.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
         this.onModClick(mod, isEquipped)
       })
 
@@ -477,7 +515,12 @@ export class ModScene extends Phaser.Scene {
       bg.strokeRoundedRect(-60, -20, 120, 40, 6)
     })
 
-    container.on('pointerdown', callback)
+    container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
 
     return container
   }
@@ -490,5 +533,481 @@ export class ModScene extends Phaser.Scene {
 
     localStorage.setItem('miniWarframeSave', JSON.stringify(window.GAME_STATE))
     this.scene.start('MenuScene')
+  }
+
+  showUpgradePanel() {
+    if (this.upgradePanel) {
+      this.closeUpgradePanel()
+      return
+    }
+
+    const width = this.cameras.main.width
+    const height = this.cameras.main.height
+
+    // 创建升级面板
+    this.upgradePanel = this.add.container(0, 0)
+
+    // 半透明背景覆盖
+    const overlay = this.add.graphics()
+    overlay.fillStyle(0x000000, 0.7)
+    overlay.fillRect(0, 0, width, height)
+    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains)
+
+    // 面板背景
+    const panelWidth = 700
+    const panelHeight = 500
+    const panelX = (width - panelWidth) / 2
+    const panelY = (height - panelHeight) / 2
+
+    const panelBg = this.add.graphics()
+    panelBg.fillStyle(0x1a1a2e, 0.98)
+    panelBg.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 12)
+    panelBg.lineStyle(2, 0x00ccff, 1)
+    panelBg.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 12)
+
+    // 标题
+    const title = this.add.text(width / 2, panelY + 30, 'MOD 升级', {
+      fontFamily: 'Arial Black',
+      fontSize: '24px',
+      color: '#00ccff'
+    }).setOrigin(0.5)
+
+    // 关闭按钮
+    const closeBtn = this.add.text(panelX + panelWidth - 30, panelY + 15, '✕', {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#ff6666'
+    }).setOrigin(0.5).setInteractive()
+    closeBtn.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      this.closeUpgradePanel()
+    })
+    closeBtn.on('pointerover', () => closeBtn.setColor('#ff9999'))
+    closeBtn.on('pointerout', () => closeBtn.setColor('#ff6666'))
+
+    // Endo显示
+    const endo = window.GAME_STATE.inventory?.endo || 0
+    const endoLabel = this.add.text(panelX + 30, panelY + 25, `Endo: ${endo.toLocaleString()}`, {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#ffcc00'
+    })
+
+    this.upgradePanel.add([overlay, panelBg, title, closeBtn, endoLabel])
+
+    // MOD列表区域
+    this.upgradeModList = this.add.container(panelX + 30, panelY + 70)
+    this.upgradePanel.add(this.upgradeModList)
+
+    // 升级详情区域
+    this.upgradeDetailContainer = this.add.container(panelX + 400, panelY + 70)
+    this.upgradePanel.add(this.upgradeDetailContainer)
+
+    // 填充MOD列表
+    this.populateUpgradeModList()
+  }
+
+  populateUpgradeModList() {
+    this.upgradeModList.removeAll(true)
+
+    const inventory = window.GAME_STATE.inventory?.mods || []
+    const modWidth = 160
+    const modHeight = 60
+    const spacing = 8
+    const cols = 2
+
+    inventory.forEach((mod, index) => {
+      const modData = MODS[mod.id]
+      if (!modData) return
+
+      const col = index % cols
+      const row = Math.floor(index / cols)
+      const x = col * (modWidth + spacing)
+      const y = row * (modHeight + spacing)
+
+      const container = this.add.container(x, y)
+
+      const rarityColor = RARITY_COLORS[modData.rarity]
+      const isMaxRank = mod.rank >= modData.maxRank
+
+      const bg = this.add.graphics()
+      bg.fillStyle(isMaxRank ? 0x224422 : 0x1a1a2e, 0.9)
+      bg.fillRoundedRect(0, 0, modWidth, modHeight, 6)
+      bg.lineStyle(2, rarityColor, 1)
+      bg.strokeRoundedRect(0, 0, modWidth, modHeight, 6)
+
+      const nameText = this.add.text(10, 10, modData.displayName, {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: '#ffffff'
+      })
+
+      const rankText = this.add.text(10, 30, `Rank ${mod.rank}/${modData.maxRank}`, {
+        fontFamily: 'Arial',
+        fontSize: '11px',
+        color: isMaxRank ? '#00ff88' : '#88aacc'
+      })
+
+      if (isMaxRank) {
+        const maxLabel = this.add.text(modWidth - 10, 10, 'MAX', {
+          fontFamily: 'Arial',
+          fontSize: '10px',
+          color: '#00ff88'
+        }).setOrigin(1, 0)
+        container.add(maxLabel)
+      }
+
+      container.add([bg, nameText, rankText])
+      container.setSize(modWidth, modHeight)
+      container.setInteractive()
+
+      container.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
+        this.selectUpgradeMod(mod, index)
+      })
+
+      container.on('pointerover', () => {
+        if (!isMaxRank) {
+          bg.clear()
+          bg.fillStyle(0x334455, 0.9)
+          bg.fillRoundedRect(0, 0, modWidth, modHeight, 6)
+          bg.lineStyle(2, 0x00ccff, 1)
+          bg.strokeRoundedRect(0, 0, modWidth, modHeight, 6)
+        }
+      })
+
+      container.on('pointerout', () => {
+        bg.clear()
+        bg.fillStyle(isMaxRank ? 0x224422 : 0x1a1a2e, 0.9)
+        bg.fillRoundedRect(0, 0, modWidth, modHeight, 6)
+        bg.lineStyle(2, rarityColor, 1)
+        bg.strokeRoundedRect(0, 0, modWidth, modHeight, 6)
+      })
+
+      this.upgradeModList.add(container)
+    })
+  }
+
+  selectUpgradeMod(mod, index) {
+    this.selectedUpgradeMod = { mod, index }
+    this.showUpgradeDetail()
+  }
+
+  showUpgradeDetail() {
+    this.upgradeDetailContainer.removeAll(true)
+
+    if (!this.selectedUpgradeMod) return
+
+    const { mod } = this.selectedUpgradeMod
+    const modData = MODS[mod.id]
+
+    if (!modData) return
+
+    const isMaxRank = mod.rank >= modData.maxRank
+    const rarityColor = RARITY_COLORS[modData.rarity]
+
+    // MOD详情卡片
+    const cardBg = this.add.graphics()
+    cardBg.fillStyle(0x223344, 0.95)
+    cardBg.fillRoundedRect(0, 0, 260, 350, 8)
+    cardBg.lineStyle(2, rarityColor, 1)
+    cardBg.strokeRoundedRect(0, 0, 260, 350, 8)
+
+    // MOD名称
+    const nameText = this.add.text(130, 25, modData.displayName, {
+      fontFamily: 'Arial Black',
+      fontSize: '18px',
+      color: '#ffffff'
+    }).setOrigin(0.5)
+
+    // 稀有度
+    const rarityNames = { common: '普通', uncommon: '罕见', rare: '稀有', legendary: '传说' }
+    const rarityText = this.add.text(130, 50, rarityNames[modData.rarity] || modData.rarity, {
+      fontFamily: 'Arial',
+      fontSize: '12px',
+      color: `#${rarityColor.toString(16).padStart(6, '0')}`
+    }).setOrigin(0.5)
+
+    // 当前等级
+    const currentRankText = this.add.text(130, 80, `当前等级: ${mod.rank} / ${modData.maxRank}`, {
+      fontFamily: 'Arial',
+      fontSize: '14px',
+      color: isMaxRank ? '#00ff88' : '#88aacc'
+    }).setOrigin(0.5)
+
+    // 描述
+    const descText = this.add.text(130, 110, modData.description, {
+      fontFamily: 'Arial',
+      fontSize: '12px',
+      color: '#aabbcc',
+      wordWrap: { width: 230 }
+    }).setOrigin(0.5, 0)
+
+    this.upgradeDetailContainer.add([cardBg, nameText, rarityText, currentRankText, descText])
+
+    // 效果显示
+    let effectY = 150
+    if (modData.getEffect) {
+      const currentEffect = modData.getEffect(mod.rank)
+      const nextEffect = mod.rank < modData.maxRank ? modData.getEffect(mod.rank + 1) : null
+
+      const effectLabel = this.add.text(20, effectY, '效果:', {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: '#88aacc'
+      })
+      effectY += 20
+
+      for (const [key, value] of Object.entries(currentEffect)) {
+        const effectName = this.getEffectName(key)
+        const valueStr = modData.isMultiplier ? `${((value - 1) * 100).toFixed(0)}%` : `${(value * 100).toFixed(0)}%`
+
+        let effectLine = `${effectName}: +${valueStr}`
+
+        if (nextEffect && nextEffect[key] !== undefined) {
+          const nextValueStr = modData.isMultiplier ? `${((nextEffect[key] - 1) * 100).toFixed(0)}%` : `${(nextEffect[key] * 100).toFixed(0)}%`
+          effectLine += ` → +${nextValueStr}`
+        }
+
+        const effectText = this.add.text(20, effectY, effectLine, {
+          fontFamily: 'Arial',
+          fontSize: '11px',
+          color: '#ffffff'
+        })
+        this.upgradeDetailContainer.add(effectText)
+        effectY += 16
+      }
+
+      this.upgradeDetailContainer.add(effectLabel)
+    }
+
+    if (!isMaxRank) {
+      // 升级费用
+      const endoCost = this.calculateUpgradeCost(mod, modData)
+      const creditCost = Math.floor(endoCost * 0.5)
+
+      const costY = 260
+      const costLabel = this.add.text(130, costY, '升级费用:', {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: '#88aacc'
+      }).setOrigin(0.5)
+
+      const endo = window.GAME_STATE.inventory?.endo || 0
+      const credits = window.GAME_STATE.credits || 0
+      const canAffordEndo = endo >= endoCost
+      const canAffordCredits = credits >= creditCost
+
+      const endoCostText = this.add.text(130, costY + 20, `Endo: ${endoCost.toLocaleString()}`, {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: canAffordEndo ? '#00ff88' : '#ff4444'
+      }).setOrigin(0.5)
+
+      const creditCostText = this.add.text(130, costY + 38, `星币: ${creditCost.toLocaleString()}`, {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: canAffordCredits ? '#00ff88' : '#ff4444'
+      }).setOrigin(0.5)
+
+      this.upgradeDetailContainer.add([costLabel, endoCostText, creditCostText])
+
+      // 升级按钮
+      const canUpgrade = canAffordEndo && canAffordCredits
+      const btnY = 320
+      const btnContainer = this.add.container(130, btnY)
+
+      const btnBg = this.add.graphics()
+      btnBg.fillStyle(canUpgrade ? 0x225522 : 0x333333, 0.9)
+      btnBg.fillRoundedRect(-80, -18, 160, 36, 6)
+      btnBg.lineStyle(2, canUpgrade ? 0x44aa44 : 0x555555, 1)
+      btnBg.strokeRoundedRect(-80, -18, 160, 36, 6)
+
+      const btnText = this.add.text(0, 0, '升级', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: canUpgrade ? '#00ff88' : '#666666'
+      }).setOrigin(0.5)
+
+      btnContainer.add([btnBg, btnText])
+      btnContainer.setSize(160, 36)
+
+      if (canUpgrade) {
+        btnContainer.setInteractive()
+        btnContainer.on('pointerdown', () => {
+          if (window.audioManager) {
+            window.audioManager.playUIClick()
+          }
+          this.upgradeMod()
+        })
+        btnContainer.on('pointerover', () => {
+          btnBg.clear()
+          btnBg.fillStyle(0x337733, 0.9)
+          btnBg.fillRoundedRect(-80, -18, 160, 36, 6)
+          btnBg.lineStyle(2, 0x00ff88, 1)
+          btnBg.strokeRoundedRect(-80, -18, 160, 36, 6)
+        })
+        btnContainer.on('pointerout', () => {
+          btnBg.clear()
+          btnBg.fillStyle(0x225522, 0.9)
+          btnBg.fillRoundedRect(-80, -18, 160, 36, 6)
+          btnBg.lineStyle(2, 0x44aa44, 1)
+          btnBg.strokeRoundedRect(-80, -18, 160, 36, 6)
+        })
+      }
+
+      this.upgradeDetailContainer.add(btnContainer)
+    } else {
+      // 已满级提示
+      const maxText = this.add.text(130, 300, '已达最高等级', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#00ff88'
+      }).setOrigin(0.5)
+      this.upgradeDetailContainer.add(maxText)
+    }
+  }
+
+  getEffectName(key) {
+    const names = {
+      maxHealth: '生命上限',
+      maxShield: '护盾上限',
+      armor: '护甲',
+      maxEnergy: '能量上限',
+      energyEfficiency: '技能效率',
+      speed: '移动速度',
+      damage: '伤害',
+      critChance: '暴击率',
+      critMultiplier: '暴击伤害',
+      fireRate: '射速',
+      reloadTime: '换弹速度',
+      magazineSize: '弹匣容量',
+      multishot: '多重射击',
+      punchThrough: '穿透',
+      abilityStrength: '技能强度',
+      abilityDuration: '技能持续',
+      abilityRange: '技能范围',
+      jumpForce: '跳跃高度',
+      energyToHealth: '能量护命',
+      critOnKill: '击杀暴击',
+      headshotCrit: '爆头暴击',
+      critUpgrade: '暴击升级'
+    }
+    return names[key] || key
+  }
+
+  calculateUpgradeCost(mod, modData) {
+    // 升级费用基于稀有度和当前等级
+    const rarityMultiplier = {
+      common: 1,
+      uncommon: 1.5,
+      rare: 2,
+      legendary: 3
+    }
+
+    const baseEndo = 80
+    const multiplier = rarityMultiplier[modData.rarity] || 1
+    // 每级费用递增
+    return Math.floor(baseEndo * multiplier * (mod.rank + 1))
+  }
+
+  upgradeMod() {
+    if (!this.selectedUpgradeMod) return
+
+    const { mod, index } = this.selectedUpgradeMod
+    const modData = MODS[mod.id]
+
+    if (!modData || mod.rank >= modData.maxRank) return
+
+    const endoCost = this.calculateUpgradeCost(mod, modData)
+    const creditCost = Math.floor(endoCost * 0.5)
+
+    const endo = window.GAME_STATE.inventory?.endo || 0
+    const credits = window.GAME_STATE.credits || 0
+
+    if (endo < endoCost || credits < creditCost) return
+
+    // 扣除资源
+    if (!window.GAME_STATE.inventory) {
+      window.GAME_STATE.inventory = {}
+    }
+    window.GAME_STATE.inventory.endo = endo - endoCost
+    window.GAME_STATE.credits = credits - creditCost
+
+    // 升级MOD
+    window.GAME_STATE.inventory.mods[index].rank += 1
+
+    // 同步已装备的MOD等级
+    this.syncEquippedModRank(mod.id, window.GAME_STATE.inventory.mods[index].rank)
+
+    // 保存
+    this.saveGame()
+
+    // 刷新显示
+    this.updateEndoDisplay()
+    this.populateUpgradeModList()
+    this.selectedUpgradeMod.mod = window.GAME_STATE.inventory.mods[index]
+    this.showUpgradeDetail()
+    this.updateDisplay()
+
+    // 更新面板中的Endo显示
+    if (this.upgradePanel) {
+      const endoLabel = this.upgradePanel.list.find(obj => obj.type === 'Text' && obj.text.startsWith('Endo:'))
+      if (endoLabel) {
+        endoLabel.setText(`Endo: ${window.GAME_STATE.inventory.endo.toLocaleString()}`)
+      }
+    }
+  }
+
+  syncEquippedModRank(modId, newRank) {
+    // 同步战甲MOD
+    this.equippedWarframeMods.forEach((mod, i) => {
+      if (mod && mod.id === modId) {
+        this.equippedWarframeMods[i].rank = newRank
+      }
+    })
+
+    // 同步武器MOD
+    this.equippedWeaponMods.forEach((mod, i) => {
+      if (mod && mod.id === modId) {
+        this.equippedWeaponMods[i].rank = newRank
+      }
+    })
+
+    // 同步到GAME_STATE
+    if (window.GAME_STATE.warframeMods) {
+      window.GAME_STATE.warframeMods.forEach((mod, i) => {
+        if (mod && mod.id === modId) {
+          window.GAME_STATE.warframeMods[i].rank = newRank
+        }
+      })
+    }
+    if (window.GAME_STATE.weaponMods) {
+      window.GAME_STATE.weaponMods.forEach((mod, i) => {
+        if (mod && mod.id === modId) {
+          window.GAME_STATE.weaponMods[i].rank = newRank
+        }
+      })
+    }
+  }
+
+  closeUpgradePanel() {
+    if (this.upgradePanel) {
+      this.upgradePanel.destroy()
+      this.upgradePanel = null
+      this.selectedUpgradeMod = null
+    }
+  }
+
+  saveGame() {
+    try {
+      localStorage.setItem('miniWarframeSave', JSON.stringify(window.GAME_STATE))
+    } catch (e) {
+      console.warn('保存失败:', e)
+    }
   }
 }

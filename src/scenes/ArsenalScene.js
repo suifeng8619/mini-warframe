@@ -107,6 +107,9 @@ export class ArsenalScene extends Phaser.Scene {
       if (isUnlocked) {
         container.setInteractive()
         container.on('pointerdown', () => {
+          if (window.audioManager) {
+            window.audioManager.playUIClick()
+          }
           this.selectWarframe(id)
         })
         container.on('pointerover', () => {
@@ -200,6 +203,9 @@ export class ArsenalScene extends Phaser.Scene {
       if (isUnlocked) {
         container.setInteractive()
         container.on('pointerdown', () => {
+          if (window.audioManager) {
+            window.audioManager.playUIClick()
+          }
           this.selectWeapon(id)
         })
         container.on('pointerover', () => {
@@ -381,7 +387,12 @@ export class ArsenalScene extends Phaser.Scene {
       bg.strokeRoundedRect(-60, -20, 120, 40, 6)
     })
 
-    container.on('pointerdown', callback)
+    container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
 
     return container
   }

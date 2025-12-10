@@ -143,7 +143,12 @@ export class ShopScene extends Phaser.Scene {
       this.updateCategoryHighlight()
     })
 
-    container.on('pointerdown', callback)
+    container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
 
     return container
   }
@@ -327,6 +332,9 @@ export class ShopScene extends Phaser.Scene {
         })
 
         itemContainer.on('pointerdown', () => {
+          if (window.audioManager) {
+            window.audioManager.playUIClick()
+          }
           this.selectedItem = item
           this.refreshItemList()
           this.refreshDetailPanel()
@@ -339,9 +347,12 @@ export class ShopScene extends Phaser.Scene {
 
   isOwned(item) {
     if (item.type === 'warframe') {
-      return (window.GAME_STATE.ownedWarframes || []).includes(item.id)
+      // 兼容两种字段名
+      const owned = window.GAME_STATE.ownedWarframes || window.GAME_STATE.unlockedWarframes || []
+      return owned.includes(item.id)
     } else if (item.type === 'weapon') {
-      return (window.GAME_STATE.ownedWeapons || []).includes(item.id)
+      const owned = window.GAME_STATE.ownedWeapons || window.GAME_STATE.unlockedWeapons || []
+      return owned.includes(item.id)
     }
     return false
   }
@@ -637,6 +648,9 @@ export class ShopScene extends Phaser.Scene {
       })
 
       button.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
         this.purchaseSelectedItem()
       })
     }
@@ -647,17 +661,28 @@ export class ShopScene extends Phaser.Scene {
   purchaseSelectedItem() {
     if (!this.selectedItem) return
 
+    // 显示确认弹窗
+    this.showConfirmDialog(
+      `确认购买 ${this.selectedItem.displayName}?`,
+      `价格: ${this.selectedItem.price.toLocaleString()} 星币`,
+      () => this.confirmPurchase()
+    )
+  }
+
+  confirmPurchase() {
+    if (!this.selectedItem) return
+
     const result = purchaseItem(
       this.selectedItem.id,
       this.currentCategory,
       {
         credits: window.GAME_STATE.credits,
-        platinum: window.GAME_STATE.platinum,
-        ownedWarframes: window.GAME_STATE.ownedWarframes,
-        ownedWeapons: window.GAME_STATE.ownedWeapons,
-        ownedMods: window.GAME_STATE.ownedMods,
-        consumables: window.GAME_STATE.consumables,
-        masteryRank: window.GAME_STATE.masteryRank
+        platinum: window.GAME_STATE.platinum || 0,
+        ownedWarframes: window.GAME_STATE.ownedWarframes || window.GAME_STATE.unlockedWarframes || [],
+        ownedWeapons: window.GAME_STATE.ownedWeapons || window.GAME_STATE.unlockedWeapons || [],
+        ownedMods: window.GAME_STATE.ownedMods || [],
+        consumables: window.GAME_STATE.consumables || {},
+        masteryRank: window.GAME_STATE.masteryRank || window.GAME_STATE.mastery || 1
       }
     )
 
@@ -667,9 +692,11 @@ export class ShopScene extends Phaser.Scene {
       window.GAME_STATE.platinum = result.playerData.platinum
 
       if (result.playerData.ownedWarframes) {
+        window.GAME_STATE.unlockedWarframes = result.playerData.ownedWarframes
         window.GAME_STATE.ownedWarframes = result.playerData.ownedWarframes
       }
       if (result.playerData.ownedWeapons) {
+        window.GAME_STATE.unlockedWeapons = result.playerData.ownedWeapons
         window.GAME_STATE.ownedWeapons = result.playerData.ownedWeapons
       }
       if (result.playerData.ownedMods) {
@@ -679,6 +706,9 @@ export class ShopScene extends Phaser.Scene {
         window.GAME_STATE.consumables = result.playerData.consumables
       }
 
+      // 保存游戏
+      this.saveGame()
+
       // 刷新UI
       this.updateCurrencyDisplay()
       this.refreshItemList()
@@ -687,6 +717,109 @@ export class ShopScene extends Phaser.Scene {
       this.showMessage(`成功购买 ${this.selectedItem.displayName}!`, '#88ff88')
     } else {
       this.showMessage(result.reason, '#ff6666')
+    }
+  }
+
+  showConfirmDialog(title, subtitle, onConfirm) {
+    // 创建遮罩
+    const overlay = this.add.graphics()
+    overlay.fillStyle(0x000000, 0.7)
+    overlay.fillRect(0, 0, this.width, this.height)
+    overlay.setDepth(900)
+
+    // 弹窗容器
+    const dialog = this.add.container(this.width / 2, this.height / 2)
+    dialog.setDepth(901)
+
+    // 背景
+    const bg = this.add.graphics()
+    bg.fillStyle(0x223344, 0.95)
+    bg.fillRoundedRect(-200, -100, 400, 200, 12)
+    bg.lineStyle(3, 0xffcc00, 1)
+    bg.strokeRoundedRect(-200, -100, 400, 200, 12)
+    dialog.add(bg)
+
+    // 标题
+    const titleText = this.add.text(0, -60, title, {
+      fontFamily: 'Arial',
+      fontSize: '22px',
+      color: '#ffffff'
+    }).setOrigin(0.5)
+    dialog.add(titleText)
+
+    // 副标题
+    const subText = this.add.text(0, -25, subtitle, {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#ffcc00'
+    }).setOrigin(0.5)
+    dialog.add(subText)
+
+    // 确认按钮
+    const confirmBtn = this.createDialogButton(dialog, -70, 50, '确认', 0x44aa44, () => {
+      overlay.destroy()
+      dialog.destroy()
+      onConfirm()
+    })
+
+    // 取消按钮
+    const cancelBtn = this.createDialogButton(dialog, 70, 50, '取消', 0x664444, () => {
+      overlay.destroy()
+      dialog.destroy()
+    })
+  }
+
+  createDialogButton(container, x, y, text, color, callback) {
+    const btn = this.add.container(x, y)
+
+    const btnBg = this.add.graphics()
+    btnBg.fillStyle(color, 0.9)
+    btnBg.fillRoundedRect(-60, -20, 120, 40, 6)
+    btnBg.lineStyle(2, 0xffffff, 0.3)
+    btnBg.strokeRoundedRect(-60, -20, 120, 40, 6)
+
+    const btnText = this.add.text(0, 0, text, {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#ffffff'
+    }).setOrigin(0.5)
+
+    btn.add([btnBg, btnText])
+    btn.setSize(120, 40)
+    btn.setInteractive()
+
+    btn.on('pointerover', () => {
+      btnBg.clear()
+      btnBg.fillStyle(color, 1)
+      btnBg.fillRoundedRect(-60, -20, 120, 40, 6)
+      btnBg.lineStyle(2, 0xffffff, 0.6)
+      btnBg.strokeRoundedRect(-60, -20, 120, 40, 6)
+    })
+
+    btn.on('pointerout', () => {
+      btnBg.clear()
+      btnBg.fillStyle(color, 0.9)
+      btnBg.fillRoundedRect(-60, -20, 120, 40, 6)
+      btnBg.lineStyle(2, 0xffffff, 0.3)
+      btnBg.strokeRoundedRect(-60, -20, 120, 40, 6)
+    })
+
+    btn.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
+
+    container.add(btn)
+    return btn
+  }
+
+  saveGame() {
+    try {
+      localStorage.setItem('miniWarframeSave', JSON.stringify(window.GAME_STATE))
+    } catch (e) {
+      console.warn('保存失败:', e)
     }
   }
 
@@ -733,6 +866,9 @@ export class ShopScene extends Phaser.Scene {
     })
 
     button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.scene.start('MenuScene')
     })
   }

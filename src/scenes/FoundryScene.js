@@ -131,7 +131,12 @@ export class FoundryScene extends Phaser.Scene {
       this.updateCategoryHighlight()
     })
 
-    container.on('pointerdown', callback)
+    container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
+      callback()
+    })
 
     return container
   }
@@ -306,6 +311,9 @@ export class FoundryScene extends Phaser.Scene {
       })
 
       itemContainer.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
         this.selectedBlueprint = blueprint
         this.refreshBlueprintList()
         this.refreshDetailPanel()
@@ -317,9 +325,11 @@ export class FoundryScene extends Phaser.Scene {
 
   isOwned(itemId) {
     if (this.currentCategory === 'warframe') {
-      return (window.GAME_STATE.ownedWarframes || []).includes(itemId)
+      const owned = window.GAME_STATE.ownedWarframes || window.GAME_STATE.unlockedWarframes || []
+      return owned.includes(itemId)
     } else if (this.currentCategory === 'weapon') {
-      return (window.GAME_STATE.ownedWeapons || []).includes(itemId)
+      const owned = window.GAME_STATE.ownedWeapons || window.GAME_STATE.unlockedWeapons || []
+      return owned.includes(itemId)
     }
     return false
   }
@@ -389,7 +399,9 @@ export class FoundryScene extends Phaser.Scene {
 
     for (const [matId, required] of Object.entries(materials || {})) {
       const matData = MATERIALS[matId]
-      const owned = window.GAME_STATE.inventory?.[matId] || 0
+      // 兼容 inventory.materials 和 inventory 两种结构
+      const owned = window.GAME_STATE.inventory?.materials?.[matId] ||
+                    window.GAME_STATE.inventory?.[matId] || 0
       const hasEnough = owned >= required
 
       if (!hasEnough) canCraft = false
@@ -496,6 +508,9 @@ export class FoundryScene extends Phaser.Scene {
       })
 
       button.on('pointerdown', () => {
+        if (window.audioManager) {
+          window.audioManager.playUIClick()
+        }
         this.startCraft()
       })
     }
@@ -506,26 +521,40 @@ export class FoundryScene extends Phaser.Scene {
   startCraft() {
     if (!this.selectedBlueprint) return
 
+    // 兼容两种材料存储结构
+    const inventoryData = window.GAME_STATE.inventory?.materials ||
+                          window.GAME_STATE.inventory || {}
+
     const result = startCrafting(
       this.selectedBlueprint.id,
       this.currentCategory,
       {
-        inventory: window.GAME_STATE.inventory,
+        inventory: inventoryData,
         foundry: window.GAME_STATE.foundry,
-        ownedWarframes: window.GAME_STATE.ownedWarframes,
-        ownedWeapons: window.GAME_STATE.ownedWeapons
+        ownedWarframes: window.GAME_STATE.ownedWarframes || window.GAME_STATE.unlockedWarframes || [],
+        ownedWeapons: window.GAME_STATE.ownedWeapons || window.GAME_STATE.unlockedWeapons || []
       }
     )
 
     if (result.success) {
-      // 更新库存
-      window.GAME_STATE.inventory = result.inventory
+      // 更新库存 - 兼容两种结构
+      if (window.GAME_STATE.inventory?.materials) {
+        window.GAME_STATE.inventory.materials = result.inventory
+      } else {
+        window.GAME_STATE.inventory = result.inventory
+      }
 
       // 添加制造任务
+      if (!window.GAME_STATE.foundry) {
+        window.GAME_STATE.foundry = { active: [] }
+      }
       if (!window.GAME_STATE.foundry.active) {
         window.GAME_STATE.foundry.active = []
       }
       window.GAME_STATE.foundry.active.push(result.craftTask)
+
+      // 保存游戏
+      this.saveGame()
 
       // 刷新UI
       this.refreshBlueprintList()
@@ -691,6 +720,9 @@ export class FoundryScene extends Phaser.Scene {
     })
 
     button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.claimItem(task, index)
     })
 
@@ -699,25 +731,40 @@ export class FoundryScene extends Phaser.Scene {
 
   claimItem(task, index) {
     const result = claimCrafted(task, {
-      inventory: window.GAME_STATE.inventory,
-      ownedWarframes: window.GAME_STATE.ownedWarframes,
-      ownedWeapons: window.GAME_STATE.ownedWeapons
+      inventory: window.GAME_STATE.inventory?.materials || window.GAME_STATE.inventory || {},
+      ownedWarframes: window.GAME_STATE.ownedWarframes || window.GAME_STATE.unlockedWarframes || [],
+      ownedWeapons: window.GAME_STATE.ownedWeapons || window.GAME_STATE.unlockedWeapons || []
     })
 
     if (result.success) {
-      // 更新游戏状态
+      // 更新游戏状态 - 同步两种字段名
       if (result.playerData.ownedWarframes) {
         window.GAME_STATE.ownedWarframes = result.playerData.ownedWarframes
+        window.GAME_STATE.unlockedWarframes = result.playerData.ownedWarframes
       }
       if (result.playerData.ownedWeapons) {
         window.GAME_STATE.ownedWeapons = result.playerData.ownedWeapons
+        window.GAME_STATE.unlockedWeapons = result.playerData.ownedWeapons
       }
       if (result.playerData.inventory) {
-        window.GAME_STATE.inventory = result.playerData.inventory
+        // 消耗品/特殊物品添加到inventory
+        if (window.GAME_STATE.inventory?.materials) {
+          // 如果是消耗品，存到inventory根目录
+          for (const [itemId, qty] of Object.entries(result.playerData.inventory)) {
+            if (typeof qty === 'number') {
+              window.GAME_STATE.inventory[itemId] = (window.GAME_STATE.inventory[itemId] || 0) + qty
+            }
+          }
+        } else {
+          window.GAME_STATE.inventory = { ...window.GAME_STATE.inventory, ...result.playerData.inventory }
+        }
       }
 
       // 移除任务
       window.GAME_STATE.foundry.active.splice(index, 1)
+
+      // 保存游戏
+      this.saveGame()
 
       // 刷新UI
       this.updateCraftingQueue()
@@ -760,7 +807,11 @@ export class FoundryScene extends Phaser.Scene {
 
     resources.forEach((res, index) => {
       const x = 100 + index * 200
-      const amount = window.GAME_STATE.inventory?.[res.id] || 0
+      // 兼容两种结构，credits在根目录，其他材料在materials里
+      const amount = res.id === 'credits'
+        ? (window.GAME_STATE.credits || 0)
+        : (window.GAME_STATE.inventory?.materials?.[res.id] ||
+           window.GAME_STATE.inventory?.[res.id] || 0)
 
       const nameText = this.add.text(x, 15, res.name, {
         fontFamily: 'Arial',
@@ -816,6 +867,9 @@ export class FoundryScene extends Phaser.Scene {
     })
 
     button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.scene.start('MenuScene')
     })
   }
@@ -838,5 +892,13 @@ export class FoundryScene extends Phaser.Scene {
         message.destroy()
       }
     })
+  }
+
+  saveGame() {
+    try {
+      localStorage.setItem('miniWarframeSave', JSON.stringify(window.GAME_STATE))
+    } catch (e) {
+      console.warn('保存失败:', e)
+    }
   }
 }

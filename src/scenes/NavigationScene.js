@@ -284,6 +284,9 @@ export class NavigationScene extends Phaser.Scene {
         })
 
         container.on('pointerdown', () => {
+          if (window.audioManager) {
+            window.audioManager.playUIClick()
+          }
           this.selectPlanet(planet)
         })
       }
@@ -409,6 +412,9 @@ export class NavigationScene extends Phaser.Scene {
     })
 
     container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.showMessage('开放世界功能开发中...', '#ffaa00')
     })
 
@@ -488,6 +494,9 @@ export class NavigationScene extends Phaser.Scene {
     })
 
     container.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.selectedNode = node
       this.refreshMissionPanel()
     })
@@ -618,6 +627,9 @@ export class NavigationScene extends Phaser.Scene {
     })
 
     button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.startMission()
     })
 
@@ -679,6 +691,9 @@ export class NavigationScene extends Phaser.Scene {
     })
 
     button.on('pointerdown', () => {
+      if (window.audioManager) {
+        window.audioManager.playUIClick()
+      }
       this.scene.start('MenuScene')
     })
   }
