@@ -304,6 +304,12 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
 
     const weaponStats = this.weaponData.baseStats
 
+    // 播放射击音效
+    const weaponType = this.weaponData?.type || 'rifle'
+    if (window.audioManager) {
+      window.audioManager.playShoot(weaponType)
+    }
+
     if (this.weaponData.baseStats.pellets) {
       // 霰弹枪
       const pellets = weaponStats.pellets
@@ -423,6 +429,11 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
   }
 
   executeAbility(ability) {
+    // 播放技能音效
+    if (window.audioManager) {
+      window.audioManager.playAbility(ability.id)
+    }
+
     // 发射能量粒子（检查粒子是否存在）
     if (this.energyParticles && this.energyParticles.active) {
       this.energyParticles.explode(20)
@@ -1097,6 +1108,11 @@ export class Warframe extends Phaser.Physics.Arcade.Sprite {
     // 扣血
     this.currentHealth -= amount
     this.invincibleTime = 500
+
+    // 播放受伤音效
+    if (window.audioManager) {
+      window.audioManager.playPlayerHurt()
+    }
 
     // 受伤效果
     this.scene.cameras.main.shake(100, 0.01)

@@ -27,6 +27,7 @@ export class GameScene extends Phaser.Scene {
     // 任务奖励累计
     this.earnedCredits = 0
     this.earnedMaterials = {}
+    this.earnedEndo = 0
 
     // 根据任务设置敌人等级范围
     if (this.missionData) {
@@ -276,6 +277,11 @@ export class GameScene extends Phaser.Scene {
       damage *= bullet.critMultiplier
     }
 
+    // 播放击中音效
+    if (window.audioManager) {
+      window.audioManager.playHit(isCrit)
+    }
+
     enemy.takeDamage(damage, isCrit)
 
     // AOE爆炸效果（如Opticor）
@@ -410,6 +416,11 @@ export class GameScene extends Phaser.Scene {
   collectPickup(player, pickup) {
     if (!pickup.active) return
 
+    // 播放拾取音效
+    if (window.audioManager) {
+      window.audioManager.playPickup(pickup.pickupType)
+    }
+
     switch (pickup.pickupType) {
       case 'energy':
         player.addEnergy(pickup.value)
@@ -525,6 +536,15 @@ export class GameScene extends Phaser.Scene {
     // 先销毁旧的文本（如果存在）
     if (this.waveAnnouncementText) {
       this.waveAnnouncementText.destroy()
+    }
+
+    // 播放波次开始或Boss警告音效
+    if (window.audioManager) {
+      if (isBossWave) {
+        window.audioManager.playBossAppear()
+      } else {
+        window.audioManager.playWaveStart()
+      }
     }
 
     let displayText = `WAVE ${this.waveNumber}`
@@ -670,6 +690,35 @@ export class GameScene extends Phaser.Scene {
     return getRandomEnemyType(wave)
   }
 
+  // 敌人被击杀时的回调（由Enemy.die()调用）
+  onEnemyKilled(enemy) {
+    // 给予星币奖励
+    const creditReward = Math.floor(10 + enemy.level * 2 + Math.random() * 10)
+    this.earnedCredits += creditReward
+
+    // 给予Endo奖励（10%概率掉落）
+    if (Math.random() < 0.1) {
+      const endoReward = Math.floor(5 + enemy.level * 0.5)
+      if (!this.earnedEndo) {
+        this.earnedEndo = 0
+      }
+      this.earnedEndo += endoReward
+    }
+
+    // 材料掉落（由任务和敌人等级决定）
+    if (this.missionData && this.missionData.drops) {
+      for (const drop of this.missionData.drops) {
+        if (Math.random() < (drop.dropChance || 0.1)) {
+          const amount = drop.amount || 1
+          if (!this.earnedMaterials[drop.id]) {
+            this.earnedMaterials[drop.id] = 0
+          }
+          this.earnedMaterials[drop.id] += amount
+        }
+      }
+    }
+  }
+
   checkWaveComplete() {
     // Boss波次检查
     if (this.currentBoss) {
@@ -763,6 +812,11 @@ export class GameScene extends Phaser.Scene {
     if (this.missionComplete) return
     this.missionComplete = true
 
+    // 播放成功音效
+    if (window.audioManager) {
+      window.audioManager.playSuccess()
+    }
+
     // 停止生成
     if (this.spawnTimer) {
       this.spawnTimer.destroy()
@@ -786,12 +840,23 @@ export class GameScene extends Phaser.Scene {
     // 发放奖励
     window.GAME_STATE.credits = (window.GAME_STATE.credits || 0) + this.earnedCredits
 
+    // 发放Endo
+    if (this.earnedEndo > 0) {
+      if (!window.GAME_STATE.inventory) {
+        window.GAME_STATE.inventory = {}
+      }
+      window.GAME_STATE.inventory.endo = (window.GAME_STATE.inventory.endo || 0) + this.earnedEndo
+    }
+
     // 发放材料
     for (const [matId, amount] of Object.entries(this.earnedMaterials)) {
       if (!window.GAME_STATE.inventory) {
         window.GAME_STATE.inventory = {}
       }
-      window.GAME_STATE.inventory[matId] = (window.GAME_STATE.inventory[matId] || 0) + amount
+      if (!window.GAME_STATE.inventory.materials) {
+        window.GAME_STATE.inventory.materials = {}
+      }
+      window.GAME_STATE.inventory.materials[matId] = (window.GAME_STATE.inventory.materials[matId] || 0) + amount
     }
 
     // 更新统计
@@ -914,11 +979,51 @@ export class GameScene extends Phaser.Scene {
   gameOver() {
     this.isGameOver = true
 
+    // 播放游戏结束音效
+    if (window.audioManager) {
+      window.audioManager.playGameOver()
+    }
+
     // 停止生成
     if (this.spawnTimer) {
       this.spawnTimer.destroy()
       this.spawnTimer = null
     }
+
+    // 结算奖励 - 失败时只获得一半
+    const creditReward = Math.floor(this.earnedCredits * 0.5)
+    window.GAME_STATE.credits += creditReward
+
+    // Endo奖励（失败时获得一半）
+    const endoReward = Math.floor((this.earnedEndo || 0) * 0.5)
+    if (endoReward > 0) {
+      if (!window.GAME_STATE.inventory) {
+        window.GAME_STATE.inventory = {}
+      }
+      window.GAME_STATE.inventory.endo = (window.GAME_STATE.inventory.endo || 0) + endoReward
+    }
+    this.endoReward = endoReward
+
+    // 材料奖励（失败时有50%概率保留每种材料）
+    const materialsKept = {}
+    for (const [matId, amount] of Object.entries(this.earnedMaterials || {})) {
+      if (Math.random() < 0.5) {
+        const keepAmount = Math.floor(amount * 0.5)
+        if (keepAmount > 0) {
+          materialsKept[matId] = keepAmount
+          if (!window.GAME_STATE.inventory) {
+            window.GAME_STATE.inventory = {}
+          }
+          if (!window.GAME_STATE.inventory.materials) {
+            window.GAME_STATE.inventory.materials = {}
+          }
+          window.GAME_STATE.inventory.materials[matId] =
+            (window.GAME_STATE.inventory.materials[matId] || 0) + keepAmount
+        }
+      }
+    }
+    this.materialsKept = materialsKept
+    this.creditReward = creditReward
 
     // 更新统计
     window.GAME_STATE.totalKills += this.killCount
@@ -944,9 +1049,9 @@ export class GameScene extends Phaser.Scene {
     this.gameOverOverlay.setDepth(400)
 
     // 游戏结束文字
-    this.gameOverText = this.add.text(640, 200, 'MISSION FAILED', {
+    this.gameOverText = this.add.text(640, 120, 'MISSION FAILED', {
       fontFamily: 'Arial Black',
-      fontSize: '64px',
+      fontSize: '56px',
       color: '#ff4444',
       stroke: '#220000',
       strokeThickness: 4
@@ -955,14 +1060,14 @@ export class GameScene extends Phaser.Scene {
     this.gameOverText.setScrollFactor(0)
     this.gameOverText.setDepth(450)
 
-    // 统计信息
-    this.gameOverStats = this.add.text(640, 320, [
+    // 任务统计
+    this.gameOverStats = this.add.text(640, 200, [
       `波次: ${this.waveNumber}`,
       `击杀: ${this.killCount}`,
       `最高波次: ${window.GAME_STATE.highScore}`
     ].join('\n'), {
       fontFamily: 'Arial',
-      fontSize: '28px',
+      fontSize: '24px',
       color: '#ffffff',
       align: 'center'
     })
@@ -970,14 +1075,85 @@ export class GameScene extends Phaser.Scene {
     this.gameOverStats.setScrollFactor(0)
     this.gameOverStats.setDepth(450)
 
+    // 奖励标题
+    const rewardTitle = this.add.text(640, 300, '--- 获得奖励 (失败减半) ---', {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: '#ffaa00'
+    })
+    rewardTitle.setOrigin(0.5)
+    rewardTitle.setScrollFactor(0)
+    rewardTitle.setDepth(450)
+
+    // 星币奖励
+    const creditText = this.add.text(640, 340, `星币: +${this.creditReward || 0}`, {
+      fontFamily: 'Arial',
+      fontSize: '22px',
+      color: '#ffcc00'
+    })
+    creditText.setOrigin(0.5)
+    creditText.setScrollFactor(0)
+    creditText.setDepth(450)
+
+    // Endo奖励
+    if (this.endoReward > 0) {
+      const endoText = this.add.text(640, 365, `Endo: +${this.endoReward}`, {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#88ccff'
+      })
+      endoText.setOrigin(0.5)
+      endoText.setScrollFactor(0)
+      endoText.setDepth(450)
+    }
+
+    // 材料奖励
+    const matEntries = Object.entries(this.materialsKept || {})
+    if (matEntries.length > 0) {
+      const MATERIALS = this.cache?.json?.get('materials') || {}
+      let matY = this.endoReward > 0 ? 400 : 375
+      for (const [matId, amount] of matEntries.slice(0, 4)) {
+        const matName = MATERIALS[matId]?.displayName || matId
+        const matText = this.add.text(640, matY, `${matName}: +${amount}`, {
+          fontFamily: 'Arial',
+          fontSize: '18px',
+          color: '#88ff88'
+        })
+        matText.setOrigin(0.5)
+        matText.setScrollFactor(0)
+        matText.setDepth(450)
+        matY += 28
+      }
+      if (matEntries.length > 4) {
+        const moreText = this.add.text(640, matY, `...还有 ${matEntries.length - 4} 种材料`, {
+          fontFamily: 'Arial',
+          fontSize: '16px',
+          color: '#888888'
+        })
+        moreText.setOrigin(0.5)
+        moreText.setScrollFactor(0)
+        moreText.setDepth(450)
+      }
+    } else {
+      const noMatY = this.endoReward > 0 ? 400 : 375
+      const noMatText = this.add.text(640, noMatY, '(未保留任何材料)', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#666666'
+      })
+      noMatText.setOrigin(0.5)
+      noMatText.setScrollFactor(0)
+      noMatText.setDepth(450)
+    }
+
     // 重新开始按钮
-    this.restartBtn = this.createButton(640, 480, '重新开始', () => {
+    this.restartBtn = this.createButton(640, 550, '重新开始', () => {
       this.scene.stop('UIScene')
       this.scene.restart()
     })
 
     // 返回菜单按钮
-    this.menuBtn = this.createButton(640, 550, '返回菜单', () => {
+    this.menuBtn = this.createButton(640, 620, '返回菜单', () => {
       this.scene.stop('UIScene')
       this.scene.start('MenuScene')
     })

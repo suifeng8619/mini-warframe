@@ -671,6 +671,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   die() {
+    // 播放死亡音效
+    if (window.audioManager) {
+      window.audioManager.playEnemyDeath()
+    }
+
     // 清理光环源引用（其他敌人可能引用此敌人作为auraSource）
     if (this.enemyData.auraEffect) {
       this.scene.enemies.getChildren().forEach(enemy => {
