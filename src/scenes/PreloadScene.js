@@ -65,13 +65,28 @@ export class PreloadScene extends Phaser.Scene {
     this.generateBulletSprite('bullet_beam', 0x00ffff, 30, 6)   // 光束武器
     this.generateBulletSprite('bullet_laser', 0x00ff00, 40, 8)  // 激光炮
 
-    // 生成敌人精灵
+    // 生成敌人精灵 - 基础阵营
     this.generateEnemySprite('grineer', 0xcc4444)
     this.generateEnemySprite('corpus', 0x4488cc)
     this.generateEnemySprite('infested', 0x66aa44)
 
+    // 生成特殊敌人精灵
+    this.generateEnemySprite('grineer_heavy', 0x882222)   // 重型Grineer
+    this.generateEnemySprite('grineer_special', 0xdd5555) // 特殊Grineer
+    this.generateEnemySprite('corpus_drone', 0x88bbee)    // Corpus无人机
+    this.generateEnemySprite('corpus_special', 0x2255aa)  // 特殊Corpus
+    this.generateEnemySprite('infested_heavy', 0x448822)  // 重型感染
+    this.generateEnemySprite('infested_special', 0x557733)// 特殊感染
+
+    // 生成Boss精灵
+    this.generateBossSprite('boss_vor', 0xffcc00)     // Vor上尉
+    this.generateBossSprite('boss_jackal', 0x4488ff)  // 豺狼
+    this.generateBossSprite('boss_phorid', 0x66dd44)  // 恐惧之源
+
     // 生成敌人弹药
     this.generateBulletSprite('enemy_bullet', 0xff4444, 8, 4)
+    this.generateBulletSprite('enemy_rocket', 0xff6600, 16, 8)  // 火箭弹
+    this.generateBulletSprite('enemy_fireball', 0xff4400, 14, 14) // 火球
 
     // 生成特效
     this.generateParticle('particle_energy', 0x00ccff)
@@ -166,6 +181,77 @@ export class PreloadScene extends Phaser.Scene {
     graphics.fillRect(width * 0.57, height * 0.75, width * 0.18, height * 0.22)
 
     graphics.generateTexture(`enemy_${faction}`, width, height)
+    graphics.destroy()
+  }
+
+  generateBossSprite(name, color) {
+    const graphics = this.make.graphics({ x: 0, y: 0, add: false })
+    const width = 80  // Boss更大
+    const height = 100
+
+    // Boss主体 - 更威严的设计
+    graphics.fillStyle(color, 1)
+    graphics.beginPath()
+    graphics.moveTo(width * 0.3, height * 0.25)
+    graphics.lineTo(width * 0.7, height * 0.25)
+    graphics.lineTo(width * 0.8, height * 0.65)
+    graphics.lineTo(width * 0.2, height * 0.65)
+    graphics.closePath()
+    graphics.fillPath()
+
+    // Boss头部 - 带角/冠
+    graphics.fillStyle(Phaser.Display.Color.IntegerToColor(color).darken(20).color, 1)
+    graphics.beginPath()
+    graphics.moveTo(width * 0.5, height * 0.05)
+    graphics.lineTo(width * 0.7, height * 0.2)
+    graphics.lineTo(width * 0.65, height * 0.3)
+    graphics.lineTo(width * 0.35, height * 0.3)
+    graphics.lineTo(width * 0.3, height * 0.2)
+    graphics.closePath()
+    graphics.fillPath()
+
+    // 左右角
+    graphics.fillStyle(Phaser.Display.Color.IntegerToColor(color).lighten(20).color, 1)
+    graphics.beginPath()
+    graphics.moveTo(width * 0.25, height * 0.15)
+    graphics.lineTo(width * 0.15, height * 0.05)
+    graphics.lineTo(width * 0.3, height * 0.2)
+    graphics.closePath()
+    graphics.fillPath()
+    graphics.beginPath()
+    graphics.moveTo(width * 0.75, height * 0.15)
+    graphics.lineTo(width * 0.85, height * 0.05)
+    graphics.lineTo(width * 0.7, height * 0.2)
+    graphics.closePath()
+    graphics.fillPath()
+
+    // 发光眼睛
+    graphics.fillStyle(0xff0000, 1)
+    graphics.fillCircle(width * 0.4, height * 0.2, 6)
+    graphics.fillCircle(width * 0.6, height * 0.2, 6)
+    graphics.fillStyle(0xffffff, 0.8)
+    graphics.fillCircle(width * 0.4, height * 0.19, 3)
+    graphics.fillCircle(width * 0.6, height * 0.19, 3)
+
+    // 腿部
+    graphics.fillStyle(Phaser.Display.Color.IntegerToColor(color).darken(30).color, 1)
+    graphics.fillRect(width * 0.25, height * 0.65, width * 0.2, height * 0.32)
+    graphics.fillRect(width * 0.55, height * 0.65, width * 0.2, height * 0.32)
+
+    // 手臂
+    graphics.fillRect(width * 0.05, height * 0.3, width * 0.18, height * 0.3)
+    graphics.fillRect(width * 0.77, height * 0.3, width * 0.18, height * 0.3)
+
+    // 能量光环
+    graphics.lineStyle(3, 0xffffff, 0.5)
+    graphics.strokeCircle(width * 0.5, height * 0.5, width * 0.45)
+
+    // 装饰
+    graphics.lineStyle(2, Phaser.Display.Color.IntegerToColor(color).lighten(50).color, 0.8)
+    graphics.lineBetween(width * 0.35, height * 0.35, width * 0.35, height * 0.55)
+    graphics.lineBetween(width * 0.65, height * 0.35, width * 0.65, height * 0.55)
+
+    graphics.generateTexture(name, width, height)
     graphics.destroy()
   }
 
